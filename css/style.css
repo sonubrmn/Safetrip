@@ -634,6 +634,16 @@ img {
   border-radius: var(--radius-xl);
   overflow: hidden;
   box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  contain: layout;
+  transform: none !important;
+  transition: none !important;
+}
+
+.map-wrapper:hover {
+  transform: none !important;
 }
 
 .map-toolbar {
@@ -711,9 +721,38 @@ img {
 }
 
 #safetyMap {
-  width: 100%;
-  height: 480px;
+  width: 100% !important;
+  height: 480px !important;
+  max-height: 480px !important;
+  min-height: 480px !important;
   z-index: 1;
+  box-sizing: border-box;
+  transform: none !important;
+  transition: none !important;
+  overflow: hidden !important;
+}
+
+#safetyMap.leaflet-container {
+  width: 100% !important;
+  height: 480px !important;
+  max-height: 480px !important;
+  min-height: 480px !important;
+  transform: none !important;
+  transition: none !important;
+  overflow: hidden !important;
+}
+
+#safetyMap:hover {
+  transform: none !important;
+  width: 100% !important;
+  height: 480px !important;
+}
+
+@keyframes ping {
+  75%, 100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
 }
 
 /* Non-intrusive Warning Banner inside Map */

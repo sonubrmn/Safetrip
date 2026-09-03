@@ -285,9 +285,31 @@ body.authority-body {
 }
 
 #authorityMap {
-  width: 100%;
-  height: 520px;
+  width: 100% !important;
+  height: 520px !important;
+  max-height: 520px !important;
+  min-height: 520px !important;
   z-index: 1;
+  box-sizing: border-box;
+  transform: none !important;
+  transition: none !important;
+  overflow: hidden !important;
+}
+
+#authorityMap.leaflet-container {
+  width: 100% !important;
+  height: 520px !important;
+  max-height: 520px !important;
+  min-height: 520px !important;
+  transform: none !important;
+  transition: none !important;
+  overflow: hidden !important;
+}
+
+#authorityMap:hover {
+  transform: none !important;
+  width: 100% !important;
+  height: 520px !important;
 }
 
 /* Incidents Queue Panel */

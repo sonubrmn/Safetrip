@@ -62,7 +62,8 @@ function initAuthorityMap() {
   authorityMap = L.map("authorityMap", {
     center: SafeTripData.center,
     zoom: 13,
-    attributionControl: false
+    attributionControl: false,
+    scrollWheelZoom: false
   });
 
   // OpenStreetMap Base Tiles

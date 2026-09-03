@@ -21,15 +21,10 @@ function createTouristMarkerIcon(riskLevel = "safe") {
   return L.divIcon({
     className: "tourist-leaflet-marker",
     html: `
-      <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-        <div style="position: absolute; width: 28px; height: 28px; border-radius: 50%; background: ${color}; opacity: 0.25; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-        <div style="width: 18px; height: 18px; border-radius: 50%; background: ${color}; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>
+      <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+        <div style="position: absolute; width: 28px; height: 28px; border-radius: 50%; background: ${color}; opacity: 0.25; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; pointer-events: none;"></div>
+        <div style="width: 18px; height: 18px; border-radius: 50%; background: ${color}; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3); pointer-events: auto;"></div>
       </div>
-      <style>
-        @keyframes ping {
-          75%, 100% { transform: scale(1.8); opacity: 0; }
-        }
-      </style>
     `,
     iconSize: [32, 32],
     iconAnchor: [16, 16]
@@ -79,7 +74,8 @@ function initSafetyMap() {
     center: centerCoords,
     zoom: 13,
     zoomControl: true,
-    attributionControl: false
+    attributionControl: false,
+    scrollWheelZoom: false // Keep geometry and zoom level stable when scrolling or hovering with cursor
   });
 
   // OpenStreetMap Tile Layer with clean visual tuning
