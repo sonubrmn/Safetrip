@@ -862,8 +862,8 @@ const SafeTripData = {
     { id: "ST-9912D4", name: "Liam O'Connor", coords: [26.9395, 75.8165], risk: "HIGH RISK", score: 91 },
     { id: "ST-3342E2", name: "Kavita Rao", coords: [26.9656, 75.8458], risk: "LOW RISK", score: 89 },
     { id: "ST-5521B7", name: "Kenji Sato", coords: [26.9060, 75.7760], risk: "CAUTION", score: 62 },
-    { id: "ST-8840F9", name: "Ananya Deshmukh", coords: [26.9200, 75.8210], risk: "LOW RISK", score: 88 }
-  ]
+  ],
+  aiLanguage: "auto"
 };
 
 // Store Helper Methods with LocalStorage Cross-Tab Synchronization
@@ -911,7 +911,7 @@ const SafeTripStore = {
   },
 
   getAiLanguage() {
-    return SafeTripData.aiLanguage || "en";
+    return SafeTripData.aiLanguage || "auto";
   },
 
   saveState() {

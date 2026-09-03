@@ -340,7 +340,7 @@ function initSafetyAIAssistant() {
     langSelect.addEventListener("change", (e) => {
       const selected = e.target.value;
       SafeTripAI.setLanguage(selected);
-      const conf = SafeTripAI.langConfig[selected] || SafeTripAI.langConfig.en;
+      const conf = SafeTripAI.langConfig[selected] || SafeTripAI.langConfig.auto;
       const chatBody = document.getElementById("aiChatBody");
       if (chatBody) {
         const bubble = document.createElement("div");
