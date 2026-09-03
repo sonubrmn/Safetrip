@@ -34,7 +34,12 @@
 
       <nav aria-label="Primary Navigation">
         <ul class="nav-links">
-          <li><a href="#explore" class="nav-link active">Explore</a></li>
+          <li class="nav-item-explore">
+            <button class="nav-link nav-link-explore active" id="navExploreBtn" aria-expanded="false" aria-haspopup="true" aria-controls="exploreDropdownMenu" onclick="toggleExploreDropdown(event)">
+              <span>Explore</span>
+              <svg class="nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </li>
           <li><a href="#safety-map" class="nav-link">Safety Map</a></li>
           <li><a href="#routes" class="nav-link">Safe Routes</a></li>
           <li><a href="#companion" class="nav-link">My Trip</a></li>
@@ -56,6 +61,85 @@
           <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Tourist Avatar">
           <span>Sid</span>
         </button>
+      </div>
+    </div>
+
+    <!-- ========================================================================
+         REFINED EXPLORE CATEGORY DROPDOWN MENU
+         ======================================================================== -->
+    <div class="explore-dropdown-overlay" id="exploreDropdownMenu" role="region" aria-label="Explore Travel Categories" style="display: none;">
+      <div class="container">
+        <div class="explore-menu-content">
+          <div class="explore-menu-header">
+            <div>
+              <span class="explore-menu-eyebrow">EDITORIAL TRAVEL DISCOVERY</span>
+              <h3 class="explore-menu-title">Where would you like to wander?</h3>
+            </div>
+            <p class="explore-menu-sub">Cinematic heritage cities, living artisan traditions, verified safe stays & secluded stepwells.</p>
+          </div>
+          <div class="explore-categories-grid">
+            <button class="explore-cat-card" data-category="destinations" onclick="handleExploreMenuSelect('destinations')">
+              <div class="cat-card-top">
+                <span class="cat-icon-badge">🏛️</span>
+                <span class="cat-badge">Royal Heritage</span>
+              </div>
+              <h4 class="cat-title">DESTINATIONS</h4>
+              <p class="cat-desc">Jaipur, Udaipur, Jodhpur, Jaisalmer, Pushkar & Mount Abu.</p>
+              <div class="cat-action-row">
+                <span class="cat-action-text">Discover Places</span>
+                <span class="cat-arrow">&rarr;</span>
+              </div>
+            </button>
+            <button class="explore-cat-card" data-category="experiences" onclick="handleExploreMenuSelect('experiences')">
+              <div class="cat-card-top">
+                <span class="cat-icon-badge">🎨</span>
+                <span class="cat-badge">Living Crafts</span>
+              </div>
+              <h4 class="cat-title">EXPERIENCES</h4>
+              <p class="cat-desc">Blue pottery workshops, Bagru woodblock printing & haveli folk music.</p>
+              <div class="cat-action-row">
+                <span class="cat-action-text">Explore Activities</span>
+                <span class="cat-arrow">&rarr;</span>
+              </div>
+            </button>
+            <button class="explore-cat-card" data-category="stays" onclick="handleExploreMenuSelect('stays')">
+              <div class="cat-card-top">
+                <span class="cat-icon-badge">🏨</span>
+                <span class="cat-badge">Verified Safe</span>
+              </div>
+              <h4 class="cat-title">STAYS</h4>
+              <p class="cat-desc">Historic noble havelis, serene garden stays & solo traveler hostels.</p>
+              <div class="cat-action-row">
+                <span class="cat-action-text">Browse Stays</span>
+                <span class="cat-arrow">&rarr;</span>
+              </div>
+            </button>
+            <button class="explore-cat-card" data-category="food" onclick="handleExploreMenuSelect('food')">
+              <div class="cat-card-top">
+                <span class="cat-icon-badge">🍲</span>
+                <span class="cat-badge">Century Flavors</span>
+              </div>
+              <h4 class="cat-title">FOOD & CULTURE</h4>
+              <p class="cat-desc">Dal baati thalis, pyaaz kachori, saffron malai ghewar & night bazaars.</p>
+              <div class="cat-action-row">
+                <span class="cat-action-text">Savor Rajasthan</span>
+                <span class="cat-arrow">&rarr;</span>
+              </div>
+            </button>
+            <button class="explore-cat-card" data-category="hidden-gems" onclick="handleExploreMenuSelect('hidden-gems')">
+              <div class="cat-card-top">
+                <span class="cat-icon-badge">💎</span>
+                <span class="cat-badge">Quiet Wonders</span>
+              </div>
+              <h4 class="cat-title">HIDDEN GEMS</h4>
+              <p class="cat-desc">Geometric stepwells, mountain spring kunds & tranquil garden pavilions.</p>
+              <div class="cat-action-row">
+                <span class="cat-action-text">Find Hidden Spots</span>
+                <span class="cat-arrow">&rarr;</span>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -235,29 +319,52 @@
     </section>
 
     <!-- ========================================================================
-         SAFETY INSIGHTS: DESTINATION CARDS
+         EDITORIAL EXPLORE & DESTINATION DISCOVERY
          ======================================================================== -->
     <section class="destinations-section" id="explore">
       <div class="container">
-        <div class="section-head">
-          <div>
-            <h2 class="section-title">Explore Jaipur: Places & Experiences</h2>
-            <p class="section-desc">Curated heritage landmarks, hands-on artisan workshops, authentic dining, and verified stays with proactive safety ratings.</p>
-          </div>
-
-          <!-- Explore Category Filter Tabs -->
-          <div class="explore-category-filter" id="exploreCategoryFilter" aria-label="Explore Categories">
-            <button class="explore-cat-btn active" data-category="all">All Highlights</button>
-            <button class="explore-cat-btn" data-category="places">🏛️ Heritage Places</button>
-            <button class="explore-cat-btn" data-category="experiences">🎨 Experiences</button>
-            <button class="explore-cat-btn" data-category="food">🍲 Local Food</button>
-            <button class="explore-cat-btn" data-category="stays">🏨 Safe Stays</button>
+        
+        <!-- Category Navigation Tabs Bar -->
+        <div class="explore-nav-bar" id="exploreNavBar" role="tablist" aria-label="Explore Travel Discovery Categories">
+          <div class="explore-tabs-scroll">
+            <button class="explore-nav-tab active" role="tab" aria-selected="true" data-category="destinations" onclick="selectExploreCategory('destinations')">
+              <span class="tab-icon">🏛️</span>
+              <span class="tab-label">DESTINATIONS</span>
+            </button>
+            <button class="explore-nav-tab" role="tab" aria-selected="false" data-category="experiences" onclick="selectExploreCategory('experiences')">
+              <span class="tab-icon">🎨</span>
+              <span class="tab-label">EXPERIENCES</span>
+            </button>
+            <button class="explore-nav-tab" role="tab" aria-selected="false" data-category="stays" onclick="selectExploreCategory('stays')">
+              <span class="tab-icon">🏨</span>
+              <span class="tab-label">STAYS</span>
+            </button>
+            <button class="explore-nav-tab" role="tab" aria-selected="false" data-category="food" onclick="selectExploreCategory('food')">
+              <span class="tab-icon">🍲</span>
+              <span class="tab-label">FOOD & CULTURE</span>
+            </button>
+            <button class="explore-nav-tab" role="tab" aria-selected="false" data-category="hidden-gems" onclick="selectExploreCategory('hidden-gems')">
+              <span class="tab-icon">💎</span>
+              <span class="tab-label">HIDDEN GEMS</span>
+            </button>
           </div>
         </div>
 
-        <div class="cards-grid" id="destinationCardsGrid">
-          <!-- Populated dynamically by app.js -->
+        <!-- Dynamic Category Discovery View -->
+        <div class="explore-category-view" id="exploreCategoryView">
+          <!-- Populated dynamically by app.js (Hero spotlight + large visual editorial discovery items) -->
         </div>
+
+        <!-- Full Destination & Experience Detail View (Hidden by default) -->
+        <div class="explore-detail-view" id="exploreDetailView" style="display: none;">
+          <!-- Populated dynamically by app.js when user clicks a destination or experience -->
+        </div>
+
+        <!-- Legacy fallback container for backward compatibility -->
+        <div class="cards-grid" id="destinationCardsGrid" style="display: none;">
+          <!-- Preserved for legacy event compatibility -->
+        </div>
+
       </div>
     </section>
 

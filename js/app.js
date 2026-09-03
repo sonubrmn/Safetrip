@@ -101,188 +101,945 @@ function initSearchInteractions() {
 /* ==========================================================================
    DESTINATION CARDS & DETAILS MODAL
    ========================================================================== */
-let currentExploreCategory = "all";
+/* ==========================================================================
+   EDITORIAL DISCOVERY & CATEGORY EXPLORATION SYSTEM
+   ========================================================================== */
+let currentExploreCategory = "destinations";
 
 function initDestinationCards() {
-  const filterContainer = document.getElementById("exploreCategoryFilter");
-  if (filterContainer) {
-    const buttons = filterContainer.querySelectorAll(".explore-cat-btn");
-    buttons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        buttons.forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        currentExploreCategory = btn.getAttribute("data-category") || "all";
-        renderExploreGrid();
+  initExploreSystem();
+}
+
+function initExploreSystem() {
+  // Bind category tabs in #exploreNavBar
+  const navBar = document.getElementById("exploreNavBar");
+  if (navBar) {
+    const tabs = navBar.querySelectorAll(".explore-nav-tab");
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        const cat = tab.getAttribute("data-category") || "destinations";
+        selectExploreCategory(cat);
       });
     });
   }
 
-  renderExploreGrid();
+  // Click outside to close explore dropdown
+  document.addEventListener("click", (e) => {
+    const menu = document.getElementById("exploreDropdownMenu");
+    const btn = document.getElementById("navExploreBtn");
+    if (!menu || !btn) return;
+    if (menu.style.display !== "none" && !menu.contains(e.target) && !btn.contains(e.target)) {
+      closeExploreDropdown();
+    }
+  });
+
+  // Escape key closes explore dropdown
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeExploreDropdown();
+    }
+  });
+
+  // Hash navigation listener
+  window.addEventListener("hashchange", handleExploreHashChange);
+
+  // Check initial hash on load
+  handleExploreHashChange();
 }
 
-function renderExploreGrid() {
-  const grid = document.getElementById("destinationCardsGrid");
-  if (!grid) return;
+function toggleExploreDropdown(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const menu = document.getElementById("exploreDropdownMenu");
+  const btn = document.getElementById("navExploreBtn");
+  if (!menu || !btn) return;
 
-  if (currentExploreCategory === "experiences") {
-    grid.innerHTML = SafeTripData.experiences.map(exp => `
-      <article class="destination-card" data-id="${exp.id}">
-        <div class="card-img-wrapper" style="background: linear-gradient(135deg, #0f172a, #334155);">
-          <img class="card-img" src="${exp.image}" alt="${exp.title}" loading="lazy" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${exp.title}', '${exp.statusClass}');">
-          <div class="card-score-badge ${exp.statusClass}">
-            <span>🎨</span>
-            <span class="score-val">${exp.safetyScore}</span>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="card-header-row">
-            <h3 class="card-title">${exp.title}</h3>
-            <span class="card-distance">${exp.duration}</span>
-          </div>
-          <p class="card-location">${exp.location}</p>
-          <div style="font-size: 13px; font-weight: 700; color: #0284c7; margin: 4px 0;">${exp.priceEst}</div>
-          <p style="font-size: 12px; color: #475569; line-height: 1.4; margin-bottom: 8px;">${exp.description}</p>
-          <div class="card-footer">
-            <span style="font-size: 11.5px; color: #059669; font-weight: 600;">🛡️ Verified Guild</span>
-            <button class="btn-card-details" onclick="SafeTripAI.addExperienceToTrip('${exp.id}')">
-              + Add to Trip
-            </button>
-          </div>
-        </div>
-      </article>
-    `).join("");
+  const isOpen = menu.style.display !== "none";
+  if (isOpen) {
+    closeExploreDropdown();
+  } else {
+    openExploreDropdown();
+  }
+}
+
+function openExploreDropdown() {
+  const menu = document.getElementById("exploreDropdownMenu");
+  const btn = document.getElementById("navExploreBtn");
+  if (!menu || !btn) return;
+
+  menu.style.display = "block";
+  btn.classList.add("open");
+  btn.setAttribute("aria-expanded", "true");
+}
+
+function closeExploreDropdown() {
+  const menu = document.getElementById("exploreDropdownMenu");
+  const btn = document.getElementById("navExploreBtn");
+  if (!menu || !btn) return;
+
+  menu.style.display = "none";
+  btn.classList.remove("open");
+  btn.setAttribute("aria-expanded", "false");
+}
+
+function handleExploreMenuSelect(catId) {
+  closeExploreDropdown();
+  selectExploreCategory(catId, true);
+
+  const section = document.getElementById("explore");
+  if (section && typeof section.scrollIntoView === "function") {
+    section.scrollIntoView({ behavior: "smooth" });
+  }
+}
+
+function selectExploreCategory(catId, updateHash = true) {
+  currentExploreCategory = catId || "destinations";
+
+  // Update tabs
+  const navBar = document.getElementById("exploreNavBar");
+  if (navBar) {
+    const tabs = navBar.querySelectorAll(".explore-nav-tab");
+    tabs.forEach(tab => {
+      if (tab.getAttribute("data-category") === currentExploreCategory) {
+        tab.classList.add("active");
+        tab.setAttribute("aria-selected", "true");
+      } else {
+        tab.classList.remove("active");
+        tab.setAttribute("aria-selected", "false");
+      }
+    });
+  }
+
+  // Ensure category discovery view is visible, detail view hidden
+  const catView = document.getElementById("exploreCategoryView");
+  const detailView = document.getElementById("exploreDetailView");
+  if (catView) catView.style.display = "block";
+  if (detailView) detailView.style.display = "none";
+
+  // Render content
+  renderExploreCategoryView(currentExploreCategory);
+
+  if (updateHash && window.location.hash !== `#explore/${currentExploreCategory}`) {
+    history.pushState(null, "", `#explore/${currentExploreCategory}`);
+  }
+}
+
+function handleExploreHashChange() {
+  const hash = window.location.hash;
+  if (!hash || hash === "#explore") {
+    selectExploreCategory("destinations", false);
     return;
   }
 
-  if (currentExploreCategory === "food") {
-    grid.innerHTML = SafeTripData.localFoods.map(food => `
-      <article class="destination-card" data-id="${food.id}">
-        <div class="card-body" style="padding: 20px;">
-          <div class="card-header-row">
-            <h3 class="card-title">${food.name}</h3>
-            <span class="diet-tag ${food.dietaryClass}">● ${food.dietary}</span>
-          </div>
-          <div style="font-size: 12px; color: #64748b; margin: 2px 0;">${food.hindiName} • <b>${food.priceEst}</b></div>
-          <p style="font-size: 12.5px; color: #334155; margin: 8px 0; line-height: 1.45;">${food.description}</p>
-          <div style="font-size: 12px; color: #0284c7; margin: 4px 0;">
-            📍 <b>Famous At:</b> ${food.famousAt}
-          </div>
-          <div style="font-size: 11.5px; color: #059669; margin: 4px 0;">
-            🛡️ <b>Safety Intel:</b> ${food.safetyNote}
-          </div>
-          <div class="card-footer" style="margin-top: 14px;">
-            <button class="btn-card-details" onclick="openSafetyAIPanel('Tell me where to eat authentic ${food.name}')">
-              Ask AI Where to Eat &rarr;
-            </button>
-          </div>
-        </div>
-      </article>
-    `).join("");
-    return;
+  if (hash.startsWith("#explore/detail/")) {
+    const id = hash.replace("#explore/detail/", "").trim();
+    if (id) {
+      openDestinationDetailView(id, false);
+    }
+  } else if (hash.startsWith("#explore/")) {
+    const cat = hash.replace("#explore/", "").trim();
+    if (cat) {
+      selectExploreCategory(cat, false);
+    }
   }
+}
 
-  if (currentExploreCategory === "stays") {
-    grid.innerHTML = SafeTripData.accommodations.map(stay => `
-      <article class="destination-card" data-id="${stay.id}">
-        <div class="card-body" style="padding: 20px;">
-          <div class="card-header-row">
-            <h3 class="card-title">${stay.name}</h3>
-            <span style="font-weight: 800; color: #0284c7; font-size: 13px;">${stay.priceNight}</span>
-          </div>
-          <p class="card-location">${stay.distance} • ⭐ ${stay.rating}</p>
-          <div class="card-status-badge ${stay.statusClass}">
-            ● Safety Score: ${stay.safetyScore}/100
-          </div>
-          <p style="font-size: 12px; color: #334155; margin: 6px 0;">${stay.whyRecommended}</p>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
-            <span style="font-size: 11px; background: #ecfdf5; color: #059669; padding: 2px 6px; border-radius: 4px;">✓ ${stay.cancellation}</span>
-          </div>
-          <div class="card-footer" style="margin-top: 14px;">
-            <button class="btn-card-details" onclick="SafeTripAI.openDemoReservation('${stay.name}')">
-              Reserve Demo
-            </button>
-          </div>
-        </div>
-      </article>
-    `).join("");
-    return;
+// ---------------------------------------------------------------------------
+// RENDER CATEGORY DISCOVERY VIEW
+// ---------------------------------------------------------------------------
+function renderExploreCategoryView(catId) {
+  const container = document.getElementById("exploreCategoryView");
+  if (!container) return;
+
+  if (catId === "experiences") {
+    renderExperiencesCategoryView(container);
+  } else if (catId === "stays") {
+    renderStaysCategoryView(container);
+  } else if (catId === "food") {
+    renderFoodCategoryView(container);
+  } else if (catId === "hidden-gems") {
+    renderHiddenGemsCategoryView(container);
+  } else {
+    // Default: destinations
+    renderDestinationsCategoryView(container);
   }
+}
 
-  // Default: Places
-  grid.innerHTML = SafeTripData.destinations.map(dest => `
-    <article class="destination-card" data-id="${dest.id}">
-      <div class="card-img-wrapper" style="background: linear-gradient(135deg, #0f172a, #334155);">
-        <img class="card-img" src="${dest.image}" alt="${dest.name}" loading="lazy" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${dest.name}', '${dest.statusClass}');">
-        <div class="card-score-badge ${dest.statusClass}">
-          <span>🛡️</span>
-          <span class="score-val">${dest.safetyScore}</span>
+// 1. DESTINATIONS CATEGORY VIEW
+function renderDestinationsCategoryView(container) {
+  const destinations = (window.SafeTripExplore && SafeTripExplore.destinations) || SafeTripData.destinations || [];
+  const heroDest = destinations[0]; // Jaipur
+  const listDest = destinations.slice(1);
+
+  let html = `
+    <!-- Featured Hero Spotlight -->
+    <article class="editorial-hero-spotlight">
+      <img class="hero-spotlight-bg" src="${heroDest.heroImage}" alt="${heroDest.title}" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${heroDest.name}', 'safe');">
+      <div class="hero-spotlight-gradient"></div>
+      <div class="hero-spotlight-content">
+        <div class="hero-spotlight-badge-row">
+          <span class="hero-spotlight-badge">FEATURED DESTINATION</span>
+          <span class="hero-safety-pill">🛡️ Safety Score: ${heroDest.safetyScore}/100 • ${heroDest.riskLevel}</span>
         </div>
-      </div>
-      <div class="card-body">
-        <div class="card-header-row">
-          <h3 class="card-title">${dest.name}</h3>
-          <span class="card-distance">${dest.distance}</span>
-        </div>
-        <p class="card-location">${dest.location}</p>
-        <div class="card-status-badge ${dest.statusClass}">
-          ● ${dest.riskLevel}
-        </div>
-        <div class="card-footer">
-          <span style="font-size: 11.5px; color: #64748b;">${dest.safeHours}</span>
-          <button class="btn-card-details" onclick="openDestinationDetails('${dest.id}')">
-            View details &rarr;
+        <h2 class="hero-spotlight-title">${heroDest.title}</h2>
+        <p class="hero-spotlight-tagline">${heroDest.tagline}</p>
+        <p class="hero-spotlight-desc">${heroDest.description}</p>
+        <div class="hero-spotlight-actions">
+          <button class="btn-hero-primary" onclick="openDestinationDetailView('${heroDest.id}')">
+            Explore Jaipur Stories &rarr;
+          </button>
+          <button class="btn-hero-secondary" onclick="openSafetyAIPanel('Plan a 3-day trip to Jaipur for under ₹10,000')">
+            ✨ Plan with SafeTrip AI
+          </button>
+          <button class="btn-hero-secondary" onclick="addExploreDestinationToTrip('${heroDest.id}')">
+            + Add to My Trip
           </button>
         </div>
       </div>
     </article>
-  `).join("");
-}
 
-function openDestinationDetails(destId) {
-  const dest = SafeTripData.destinations.find(d => d.id === destId);
-  if (!dest) return;
-
-  const modal = document.getElementById("detailsModal");
-  const modalContent = document.getElementById("detailsModalContent");
-  if (!modal || !modalContent) return;
-
-  modalContent.innerHTML = `
-    <div style="margin-bottom: 16px;">
-      <img src="${dest.image}" alt="${dest.name}" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${dest.name}', '${dest.statusClass}');" style="width: 100%; height: 180px; object-fit: cover; border-radius: 12px; margin-bottom: 14px; background: linear-gradient(135deg, #0f172a, #334155);">
-      <div style="display: flex; justify-content: space-between; align-items: baseline;">
-        <h3 style="font-size: 20px; font-weight: 700; color: #0f172a;">${dest.name}</h3>
-        <span style="font-size: 15px; font-weight: 700; color: ${dest.statusClass === 'safe' ? '#10b981' : '#f59e0b'};">
-          Safety Score: ${dest.safetyScore}/100
-        </span>
+    <!-- Editorial Discovery Stack -->
+    <div class="editorial-discovery-section">
+      <div class="editorial-section-head">
+        <div>
+          <h3 class="editorial-section-title">Royal Heritage Cities & Citadels</h3>
+          <p class="editorial-section-desc">Curated Rajasthan destinations offering living culture, iconic architecture, and verified tourist safety corridors.</p>
+        </div>
       </div>
-      <p style="font-size: 13px; color: #64748b; margin-top: 4px;">${dest.location} • Distance from you: ${dest.distance}</p>
-    </div>
 
-    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 16px;">
-      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 6px;">Safety Intelligence</div>
-      <p style="font-size: 13px; color: #1e293b; line-height: 1.45;">${dest.highlight}</p>
-      <div style="font-size: 12.5px; color: #64748b; margin-top: 8px;">
-        Recommended Visiting Hours: <b>${dest.safeHours}</b>
-      </div>
-    </div>
+      <div class="editorial-cards-stack">
+        ${listDest.map((dest, idx) => `
+          <article class="editorial-feature-card ${idx % 2 === 1 ? 'reverse' : ''}">
+            <div class="feature-img-wrapper">
+              <img class="feature-img" src="${dest.heroImage}" alt="${dest.title}" loading="lazy" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${dest.name}', '${dest.statusClass}');">
+              <span class="feature-floating-badge">${dest.region}</span>
+              <span class="feature-safety-badge ${dest.statusClass}">🛡️ Safety: ${dest.safetyScore}/100</span>
+            </div>
+            <div class="feature-content">
+              <div>
+                <span class="feature-tagline-eyebrow">${dest.state} • ${dest.idealDuration}</span>
+                <h3 class="feature-title">${dest.title}</h3>
+                <p class="feature-desc">${dest.description}</p>
 
-    <div>
-      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Security Assets Present</div>
-      <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
-        ${dest.features.map(f => `
-          <li style="font-size: 12.5px; color: #334155; display: flex; align-items: center; gap: 8px;">
-            <span style="color: #10b981; font-weight: bold;">✓</span> ${f}
-          </li>
+                <!-- What this place is famous for -->
+                <div class="feature-highlights-box">
+                  <div class="feature-highlights-title">
+                    <span>✨</span> What ${dest.name} Is Famous For:
+                  </div>
+                  <div class="famous-for-chips">
+                    ${dest.famousFor.slice(0, 3).map(f => `
+                      <span class="famous-chip">${f}</span>
+                    `).join("")}
+                  </div>
+                </div>
+
+                <!-- Don't Miss Highlight -->
+                ${dest.dontMiss && dest.dontMiss[0] ? `
+                  <div class="dont-miss-preview-pill">
+                    <b>DON'T MISS:</b> ${dest.dontMiss[0].title} (${dest.dontMiss[0].duration})
+                  </div>
+                ` : ""}
+              </div>
+
+              <div class="feature-action-bar">
+                <button class="btn-card-explore-main" onclick="openDestinationDetailView('${dest.id}')">
+                  View Full Details &rarr;
+                </button>
+                <button class="btn-card-plan-ai" onclick="openSafetyAIPanel('Plan a trip to ${dest.name} for 2 days')">
+                  ✨ Plan with AI
+                </button>
+                <button class="btn-card-add-trip" onclick="addExploreDestinationToTrip('${dest.id}')">
+                  + Add to Trip
+                </button>
+              </div>
+            </div>
+          </article>
         `).join("")}
-      </ul>
-      <button class="btn-res-action primary" onclick="closeAllModals(); openSafetyAIPanel('What is ${dest.name} famous for?');" style="width: 100%; padding: 10px 16px; font-size: 13px; font-weight: 600;">
-        ✨ Ask AI Travel Companion About ${dest.name}
-      </button>
+      </div>
     </div>
   `;
 
-  modal.classList.add("open");
+  container.innerHTML = html;
 }
+
+// 2. EXPERIENCES CATEGORY VIEW
+function renderExperiencesCategoryView(container) {
+  const experiences = (window.SafeTripExplore && SafeTripExplore.experiences) || SafeTripData.experiences || [];
+  const heroExp = experiences[0];
+  const listExp = experiences.slice(1);
+
+  let html = `
+    <!-- Hero Spotlight -->
+    <article class="editorial-hero-spotlight">
+      <img class="hero-spotlight-bg" src="${heroExp.image}" alt="${heroExp.title}" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${heroExp.title}', 'safe');">
+      <div class="hero-spotlight-gradient"></div>
+      <div class="hero-spotlight-content">
+        <div class="hero-spotlight-badge-row">
+          <span class="hero-spotlight-badge">${heroExp.category}</span>
+          <span class="hero-safety-pill">🛡️ Safety Score: ${heroExp.safetyScore}/100 • Verified Guild</span>
+        </div>
+        <h2 class="hero-spotlight-title">${heroExp.title}</h2>
+        <p class="hero-spotlight-tagline">${heroExp.location} • ${heroExp.duration} • ${heroExp.priceEst}</p>
+        <p class="hero-spotlight-desc">${heroExp.description}</p>
+        <div class="hero-spotlight-actions">
+          <button class="btn-hero-primary" onclick="addExploreExperienceToTrip('${heroExp.id}')">
+            + Add to My Trip
+          </button>
+          <button class="btn-hero-secondary" onclick="openSafetyAIPanel('Tell me more about the ${heroExp.title} in Jaipur')">
+            ✨ Ask AI About This Masterclass
+          </button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Editorial Cards Stack -->
+    <div class="editorial-discovery-section">
+      <div class="editorial-section-head">
+        <div>
+          <h3 class="editorial-section-title">Hands-On Workshops & Living Traditions</h3>
+          <p class="editorial-section-desc">Experience authentic Rajasthani craftsmanship, folk arts, and culinary walks directly with 4th-generation masters.</p>
+        </div>
+      </div>
+
+      <div class="editorial-cards-stack">
+        ${listExp.map((exp, idx) => `
+          <article class="editorial-feature-card ${idx % 2 === 1 ? 'reverse' : ''}">
+            <div class="feature-img-wrapper">
+              <img class="feature-img" src="${exp.image}" alt="${exp.title}" loading="lazy" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${exp.title}', '${exp.statusClass}');">
+              <span class="feature-floating-badge">${exp.category}</span>
+              <span class="feature-safety-badge ${exp.statusClass}">🛡️ Safety: ${exp.safetyScore}/100</span>
+            </div>
+            <div class="feature-content">
+              <div>
+                <span class="feature-tagline-eyebrow">${exp.location} • ${exp.duration}</span>
+                <h3 class="feature-title">${exp.title}</h3>
+                <p class="feature-desc">${exp.description}</p>
+
+                <div class="feature-highlights-box">
+                  <div class="feature-highlights-title">
+                    <span>🛡️</span> Why Recommended by SafeTrip:
+                  </div>
+                  <p style="font-size: 12.5px; color: #334155; margin: 0; line-height: 1.5;">${exp.whyRecommended}</p>
+                </div>
+
+                <div class="famous-for-chips" style="margin-bottom: 16px;">
+                  ${exp.tags.map(t => `<span class="famous-chip">● ${t}</span>`).join("")}
+                  ${exp.suitableFor ? `<span class="famous-chip" style="background: #f0fdf4; color: #166534; border-color: #bbf7d0;">👤 ${exp.suitableFor}</span>` : ""}
+                </div>
+              </div>
+
+              <div class="feature-action-bar">
+                <span style="font-size: 15px; font-weight: 800; color: #0284c7;">${exp.priceEst}</span>
+                <div style="display: flex; gap: 8px; margin-left: auto;">
+                  <button class="btn-card-plan-ai" onclick="openSafetyAIPanel('How can I book or participate in ${exp.title}?')">
+                    ✨ Ask AI
+                  </button>
+                  <button class="btn-card-explore-main" onclick="addExploreExperienceToTrip('${exp.id}')">
+                    + Add to Trip
+                  </button>
+                </div>
+              </div>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+// 3. STAYS CATEGORY VIEW
+function renderStaysCategoryView(container) {
+  const stays = (window.SafeTripExplore && SafeTripExplore.stays) || SafeTripData.accommodations || [];
+  const heroStay = stays[0];
+  const listStays = stays.slice(1);
+
+  let html = `
+    <!-- Hero Spotlight -->
+    <article class="editorial-hero-spotlight">
+      <img class="hero-spotlight-bg" src="${heroStay.image}" alt="${heroStay.name}" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${heroStay.name}', 'safe');">
+      <div class="hero-spotlight-gradient"></div>
+      <div class="hero-spotlight-content">
+        <div class="hero-spotlight-badge-row">
+          <span class="hero-spotlight-badge">${heroStay.type}</span>
+          <span class="hero-safety-pill">🛡️ Safety Score: ${heroStay.safetyScore}/100 • Verified Safe Precinct</span>
+        </div>
+        <h2 class="hero-spotlight-title">${heroStay.name}</h2>
+        <p class="hero-spotlight-tagline">${heroStay.location} • ${heroStay.rating} • <b>${heroStay.priceNight}</b></p>
+        <p class="hero-spotlight-desc">${heroStay.description}</p>
+        <div class="hero-spotlight-actions">
+          <button class="btn-hero-primary" onclick="SafeTripAI.openDemoReservation('${heroStay.name}')">
+            Reserve Demo Stay
+          </button>
+          <button class="btn-hero-secondary" onclick="openSafetyAIPanel('Is ${heroStay.name} in a safe location for solo travelers?')">
+            ✨ Ask AI About Safety
+          </button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Editorial Cards Stack -->
+    <div class="editorial-discovery-section">
+      <div class="editorial-section-head">
+        <div>
+          <h3 class="editorial-section-title">Verified Safe Havelis, Stays & Hostels</h3>
+          <p class="editorial-section-desc">Accommodations audited for continuous illumination, verified staff backgrounds, female safety, and proximity to tourist police beats.</p>
+        </div>
+      </div>
+
+      <div class="editorial-cards-stack">
+        ${listStays.map((stay, idx) => `
+          <article class="editorial-feature-card ${idx % 2 === 1 ? 'reverse' : ''}">
+            <div class="feature-img-wrapper">
+              <img class="feature-img" src="${stay.image}" alt="${stay.name}" loading="lazy" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${stay.name}', '${stay.statusClass}');">
+              <span class="feature-floating-badge">${stay.type}</span>
+              <span class="feature-safety-badge ${stay.statusClass}">🛡️ Safety: ${stay.safetyScore}/100</span>
+            </div>
+            <div class="feature-content">
+              <div>
+                <span class="feature-tagline-eyebrow">${stay.location} • ⭐ ${stay.rating}</span>
+                <h3 class="feature-title">${stay.name}</h3>
+                <p class="feature-desc">${stay.description}</p>
+
+                <div class="feature-highlights-box">
+                  <div class="feature-highlights-title">
+                    <span>🛡️</span> Safety Intelligence & Verification:
+                  </div>
+                  <p style="font-size: 12.5px; color: #334155; margin: 0; line-height: 1.5;">${stay.whyRecommended}</p>
+                </div>
+
+                <div class="famous-for-chips" style="margin-bottom: 16px;">
+                  ${stay.features ? stay.features.map(f => `<span class="famous-chip">✓ ${f}</span>`).join("") : ""}
+                  ${stay.cancellation ? `<span class="famous-chip" style="background: #ecfdf5; color: #065f46; border-color: #a7f3d0;">${stay.cancellation}</span>` : ""}
+                </div>
+              </div>
+
+              <div class="feature-action-bar">
+                <span style="font-size: 15px; font-weight: 800; color: #0284c7;">${stay.priceNight}</span>
+                <div style="display: flex; gap: 8px; margin-left: auto;">
+                  <button class="btn-card-plan-ai" onclick="openSafetyAIPanel('Find nearby safe restaurants around ${stay.name}')">
+                    ✨ Ask AI
+                  </button>
+                  <button class="btn-card-explore-main" onclick="SafeTripAI.openDemoReservation('${stay.name}')">
+                    Reserve Demo
+                  </button>
+                </div>
+              </div>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+// 4. FOOD & CULTURE CATEGORY VIEW
+function renderFoodCategoryView(container) {
+  const foods = SafeTripData.localFoods || [];
+  const heroFood = foods[0]; // Dal Baati
+  const listFoods = foods.slice(1);
+
+  let html = `
+    <!-- Hero Spotlight -->
+    <article class="editorial-hero-spotlight">
+      <img class="hero-spotlight-bg" src="https://images.unsplash.com/photo-1601050690597-df0568f70950?w=1600&auto=format&fit=crop&q=85" alt="${heroFood.name}" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${heroFood.name}', 'safe');">
+      <div class="hero-spotlight-gradient"></div>
+      <div class="hero-spotlight-content">
+        <div class="hero-spotlight-badge-row">
+          <span class="hero-spotlight-badge">ROYAL SIGNATURE DISH</span>
+          <span class="hero-safety-pill">🍲 High Turnover Hygienic Kitchens</span>
+        </div>
+        <h2 class="hero-spotlight-title">${heroFood.name} (${heroFood.hindiName})</h2>
+        <p class="hero-spotlight-tagline">${heroFood.category} • ${heroFood.dietary} • <b>${heroFood.priceEst}</b></p>
+        <p class="hero-spotlight-desc">${heroFood.description}</p>
+        <div class="hero-spotlight-actions">
+          <button class="btn-hero-primary" onclick="openSafetyAIPanel('Where can I get the best authentic Dal Baati Churma in Jaipur?')">
+            ✨ Ask AI Where to Eat
+          </button>
+          <button class="btn-hero-secondary" onclick="openSafetyAIPanel('What is the story behind Dal Baati Churma in Rajput history?')">
+            📖 Cultural History
+          </button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Editorial Cards Stack -->
+    <div class="editorial-discovery-section">
+      <div class="editorial-section-head">
+        <div>
+          <h3 class="editorial-section-title">Century-Old Cauldron Recipes & Sweet Houses</h3>
+          <p class="editorial-section-desc">Authentic street food, saffron desserts, and royal curries with verified food hygiene and safety advice.</p>
+        </div>
+      </div>
+
+      <div class="editorial-cards-stack">
+        ${listFoods.map((food, idx) => `
+          <article class="editorial-feature-card ${idx % 2 === 1 ? 'reverse' : ''}">
+            <div class="feature-img-wrapper" style="min-height: 260px;">
+              <img class="feature-img" src="https://images.unsplash.com/photo-1601050690597-df0568f70950?w=900&auto=format&fit=crop&q=80" alt="${food.name}" loading="lazy" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${food.name}', 'safe');">
+              <span class="feature-floating-badge">${food.category}</span>
+              <span class="feature-safety-badge safe">🍲 ${food.dietary}</span>
+            </div>
+            <div class="feature-content">
+              <div>
+                <span class="feature-tagline-eyebrow">${food.hindiName} • ${food.priceEst}</span>
+                <h3 class="feature-title">${food.name}</h3>
+                <p class="feature-desc">${food.description}</p>
+
+                <div class="feature-highlights-box">
+                  <div class="feature-highlights-title">
+                    <span>📍</span> Famous Heritage Outlets:
+                  </div>
+                  <p style="font-size: 13px; font-weight: 700; color: #0284c7; margin: 0 0 6px;">${food.famousAt}</p>
+                  <p style="font-size: 12px; color: #059669; margin: 0;">🛡️ <b>Safety Intel:</b> ${food.safetyNote}</p>
+                </div>
+              </div>
+
+              <div class="feature-action-bar">
+                <button class="btn-card-plan-ai" onclick="openSafetyAIPanel('Tell me the best time and route to eat ${food.name} safely')">
+                  ✨ Ask AI Where to Eat &rarr;
+                </button>
+                <button class="btn-card-add-trip" onclick="SafeTripStore.addToMyTrip({ id: 'trip-food-${food.id}', title: 'Taste ${food.name} at ${food.famousAt.split('&')[0].trim()}', type: 'food', day: 'Day 1', time: 'Evening', estCost: '${food.priceEst}', safetyScore: 95 }); showToastNotification('✓ Added ${food.name} to My Trip!');">
+                  + Add to Trip
+                </button>
+              </div>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+// 5. HIDDEN GEMS CATEGORY VIEW
+function renderHiddenGemsCategoryView(container) {
+  const gems = (window.SafeTripExplore && SafeTripExplore.hiddenGems) || [];
+  const heroGem = gems[0]; // Panna Meena Ka Kund
+  const listGems = gems.slice(1);
+
+  let html = `
+    <!-- Hero Spotlight -->
+    <article class="editorial-hero-spotlight">
+      <img class="hero-spotlight-bg" src="${heroGem.image}" alt="${heroGem.name}" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${heroGem.name}', 'safe');">
+      <div class="hero-spotlight-gradient"></div>
+      <div class="hero-spotlight-content">
+        <div class="hero-spotlight-badge-row">
+          <span class="hero-spotlight-badge">${heroGem.category}</span>
+          <span class="hero-safety-pill">🛡️ Safety Score: ${heroGem.safetyScore}/100 • Secluded Escape</span>
+        </div>
+        <h2 class="hero-spotlight-title">${heroGem.name}</h2>
+        <p class="hero-spotlight-tagline">${heroGem.tagline} • ${heroGem.location}</p>
+        <p class="hero-spotlight-desc">${heroGem.description}</p>
+        <div class="hero-spotlight-actions">
+          <button class="btn-hero-primary" onclick="openDestinationDetailView('${heroGem.id}')">
+            Explore Stepwell Secrets &rarr;
+          </button>
+          <button class="btn-hero-secondary" onclick="openSafetyAIPanel('How do I visit Panna Meena Ka Kund stepwell safely from Amer Fort?')">
+            ✨ Ask AI Route & Timing
+          </button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Editorial Cards Stack -->
+    <div class="editorial-discovery-section">
+      <div class="editorial-section-head">
+        <div>
+          <h3 class="editorial-section-title">Beyond The Regular Tourist Trails</h3>
+          <p class="editorial-section-desc">Ancient geometric stepwells, sacred mountain springs, and quiet royal water pavilions away from coach crowds.</p>
+        </div>
+      </div>
+
+      <div class="editorial-cards-stack">
+        ${listGems.map((gem, idx) => `
+          <article class="editorial-feature-card ${idx % 2 === 1 ? 'reverse' : ''}">
+            <div class="feature-img-wrapper">
+              <img class="feature-img" src="${gem.image}" alt="${gem.name}" loading="lazy" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${gem.name}', '${gem.statusClass}');">
+              <span class="feature-floating-badge">${gem.category}</span>
+              <span class="feature-safety-badge ${gem.statusClass}">🛡️ Safety: ${gem.safetyScore}/100</span>
+            </div>
+            <div class="feature-content">
+              <div>
+                <span class="feature-tagline-eyebrow">${gem.location}</span>
+                <h3 class="feature-title">${gem.name}</h3>
+                <p class="feature-desc">${gem.description}</p>
+
+                <div class="feature-highlights-box">
+                  <div class="feature-highlights-title">
+                    <span>💎</span> Why This Spot Is Special:
+                  </div>
+                  <p style="font-size: 13px; color: #334155; margin: 0 0 6px; line-height: 1.5;">${gem.whySpecial}</p>
+                  <p style="font-size: 12px; color: #0284c7; margin: 0;">💡 <b>Insider Tip:</b> ${gem.practicalTip}</p>
+                </div>
+              </div>
+
+              <div class="feature-action-bar">
+                <button class="btn-card-explore-main" onclick="openDestinationDetailView('${gem.id}')">
+                  View Full Details &rarr;
+                </button>
+                <button class="btn-card-plan-ai" onclick="openSafetyAIPanel('Give me safety advice and photography tips for visiting ${gem.name}')">
+                  ✨ Ask AI
+                </button>
+                <button class="btn-card-add-trip" onclick="SafeTripStore.addToMyTrip({ id: 'trip-gem-${gem.id}', title: 'Visit ${gem.name}', type: 'hidden-gem', day: 'Day 2', time: 'Morning', estCost: 'Free', safetyScore: ${gem.safetyScore} }); showToastNotification('✓ Added ${gem.name} to My Trip!');">
+                  + Add to Trip
+                </button>
+              </div>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
+// DESTINATION & EXPERIENCE FULL DETAIL VIEW
+// ---------------------------------------------------------------------------
+function openDestinationDetailView(id, updateHash = true) {
+  // Find destination from SafeTripExplore or SafeTripData
+  let item = null;
+  if (window.SafeTripExplore) {
+    item = SafeTripExplore.getDestinationById(id) ||
+           SafeTripExplore.getExperienceById(id) ||
+           SafeTripExplore.getGemById(id);
+  }
+  if (!item && SafeTripData.destinations) {
+    item = SafeTripData.destinations.find(d => d.id === id);
+  }
+  if (!item) return;
+
+  const catView = document.getElementById("exploreCategoryView");
+  const detailView = document.getElementById("exploreDetailView");
+  if (!catView || !detailView) return;
+
+  catView.style.display = "none";
+  detailView.style.display = "block";
+
+  // Build complete editorial detail view
+  const heroImage = item.heroImage || item.image || "https://images.unsplash.com/photo-1609948549021-95be246dbece?w=1600&auto=format&fit=crop&q=85";
+  const title = item.title || item.name;
+  const tagline = item.tagline || item.location || "Historic Heritage Landmark";
+  const safetyScore = item.safetyScore || 92;
+  const riskLevel = item.riskLevel || (safetyScore >= 80 ? "LOW RISK" : "CAUTION");
+  const famousForList = item.famousFor || [
+    "Iconic royal architecture and intricate sandstone craftsmanship",
+    "UNESCO World Heritage preservation precinct",
+    "High security perimeter with continuous beat police coverage",
+    "Vibrant living artisan bazaars and Rajasthani hospitality"
+  ];
+
+  const dontMissList = item.dontMiss || [
+    {
+      title: "Guided Heritage Walk at Early Morning",
+      category: "Heritage Wonder",
+      duration: "2 Hours",
+      budget: "₹100 – ₹300",
+      description: "Experience the site in golden morning light before tourist crowds arrive. Notice the precision masonry and intricate carved stone lattices.",
+      insiderTip: "Carry drinking water and wear comfortable walking footwear."
+    },
+    {
+      title: "Local Culinary Tasting",
+      category: "Food & Senses",
+      duration: "1 Hour",
+      budget: "₹150 – ₹350",
+      description: "Taste traditional Rajasthani snacks and sweets at verified hygienic outlets in the adjacent heritage bazaar.",
+      insiderTip: "Ask for freshly made hot items served straight from the cauldron."
+    }
+  ];
+
+  detailView.innerHTML = `
+    <div class="detail-back-bar">
+      <button class="btn-back-explore" onclick="backToExploreCategories()">
+        <span>&larr;</span> Back to Explore ${currentExploreCategory.toUpperCase()}
+      </button>
+      <span style="font-size: 13px; color: #64748b;">SafeTrip Smart Tourism Discovery</span>
+    </div>
+
+    <!-- Full-Bleed Hero Banner -->
+    <div class="detail-hero-banner">
+      <img src="${heroImage}" alt="${title}" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${title}', 'safe');">
+      <div class="detail-hero-overlay"></div>
+      <div class="detail-hero-text">
+        <span class="hero-spotlight-badge" style="margin-bottom: 8px; display: inline-block;">DESTINATION INTELLIGENCE</span>
+        <h1 class="detail-hero-title">${title}</h1>
+        <p class="detail-hero-tagline">${tagline}</p>
+      </div>
+    </div>
+
+    <!-- Action Toolbar -->
+    <div class="detail-actions-bar">
+      <div class="detail-actions-left">
+        <button class="btn-action-primary" onclick="openSafetyAIPanel('Plan a curated visit to ${title} under budget with safe routes')">
+          ✨ Plan with SafeTrip AI
+        </button>
+        <button class="btn-action-secondary" onclick="addExploreDestinationToTrip('${item.id}')">
+          + Add to My Trip
+        </button>
+      </div>
+      <div class="detail-actions-right">
+        <a href="#safety-map" class="btn-action-secondary" onclick="focusOnMapCoords(${item.coords ? item.coords[0] : 26.9239}, ${item.coords ? item.coords[1] : 75.8267}, '${item.name || title}')">
+          🗺️ View on Safety Map
+        </a>
+        <a href="#routes" class="btn-action-secondary">
+          🛡️ Safe Route
+        </a>
+      </div>
+    </div>
+
+    <!-- 2-Column Content Grid -->
+    <div class="detail-content-grid">
+      <!-- Main Content Column -->
+      <div class="detail-main-col">
+        
+        <!-- Section: What this place is famous for -->
+        <div class="detail-block">
+          <h3 class="detail-block-title">
+            <span>🏛️</span> What Is ${item.name || title} Famous For?
+            <span class="detail-block-title-sub">Verified Heritage Facts</span>
+          </h3>
+          <div class="famous-for-grid">
+            ${famousForList.map(f => `
+              <div class="famous-for-item">
+                <span class="famous-for-check">✓</span>
+                <p class="famous-for-text">${f}</p>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+
+        <!-- Section: DON'T MISS Storytelling -->
+        <div class="detail-block">
+          <h3 class="detail-block-title">
+            <span>⭐</span> DON'T MISS — Curated Storytelling
+            <span class="detail-block-title-sub">Things You Genuinely Shouldn't Miss</span>
+          </h3>
+          <div class="dont-miss-cards-list">
+            ${dontMissList.map(dm => `
+              <div class="dont-miss-card">
+                <div class="dont-miss-header">
+                  <span class="dont-miss-category">${dm.category}</span>
+                  <span class="dont-miss-meta">⏱️ ${dm.duration} • 💰 ${dm.budget}</span>
+                </div>
+                <h4 class="dont-miss-title">${dm.title}</h4>
+                <p class="dont-miss-desc">${dm.description}</p>
+                <div class="dont-miss-tip">
+                  💡 <b>Insider Advice:</b> ${dm.insiderTip}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+
+        <!-- Section: Recommended Connected Experiences -->
+        <div class="detail-block">
+          <h3 class="detail-block-title">
+            <span>🎨</span> Recommended Experiences in ${item.name || title}
+            <span class="detail-block-title-sub">Hands-On Living Traditions</span>
+          </h3>
+          <div class="connected-experiences-grid">
+            ${((window.SafeTripExplore && SafeTripExplore.experiences) || []).slice(0, 4).map(e => `
+              <div class="connected-exp-card">
+                <img class="connected-exp-img" src="${e.image}" alt="${e.title}" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${e.title}', 'safe');">
+                <div class="connected-exp-body">
+                  <div>
+                    <h5 class="connected-exp-title">${e.title}</h5>
+                    <div class="connected-exp-meta">${e.duration} • <b>${e.priceEst}</b></div>
+                  </div>
+                  <button class="connected-exp-btn" onclick="addExploreExperienceToTrip('${e.id}')">
+                    + Add to Trip
+                  </button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Sidebar Practical Intelligence Column -->
+      <div class="detail-sidebar-col">
+        
+        <!-- Practical Info Card -->
+        <div class="practical-info-card">
+          <h4 class="practical-info-title">Tourist Safety & Practical Intel</h4>
+          
+          <div class="practical-row">
+            <span class="practical-label">Safety Score</span>
+            <span class="practical-val" style="color: ${safetyScore >= 80 ? '#059669' : '#d97706'};">
+              🛡️ ${safetyScore}/100 (${riskLevel})
+            </span>
+          </div>
+
+          <div class="practical-row">
+            <span class="practical-label">Safe Visiting Hours</span>
+            <span class="practical-val">${item.safeHours || '08:00 AM – 07:00 PM'}</span>
+          </div>
+
+          <div class="practical-row">
+            <span class="practical-label">Nearest Police Post</span>
+            <span class="practical-val">${item.policePost || 'Tourist Police Beat 4 (120m)'}</span>
+          </div>
+
+          <div class="practical-row">
+            <span class="practical-label">Ideal Duration</span>
+            <span class="practical-val">${item.idealDuration || item.duration || '2 – 3 Hours'}</span>
+          </div>
+
+          <div class="practical-row">
+            <span class="practical-label">Estimated Budget</span>
+            <span class="practical-val">${item.estimatedBudget || item.priceEst || '₹250 – ₹500'}</span>
+          </div>
+
+          <div class="practical-row">
+            <span class="practical-label">Best Season / Time</span>
+            <span class="practical-val">${item.bestTime || 'Morning 8:30 AM – 11:00 AM'}</span>
+          </div>
+
+          <div class="practical-row" style="border-bottom: none;">
+            <span class="practical-label">Accessibility</span>
+            <span class="practical-val">${item.accessibility || 'Paved paths, level access'}</span>
+          </div>
+        </div>
+
+        <!-- Signature Local Food -->
+        <div class="practical-info-card">
+          <h4 class="practical-info-title">Signature Local Food to Try</h4>
+          <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+            ${(item.foodHighlights || ["Dal Baati Churma", "Pyaaz Kachori", "Malai Ghewar", "Special Kulhad Lassi"]).map(f => `
+              <li style="font-size: 13px; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <span style="color: #0284c7;">🍲</span> <b>${f}</b>
+              </li>
+            `).join("")}
+          </ul>
+          <button class="btn-res-action primary" onclick="openSafetyAIPanel('Recommend authentic places to eat near ${title}')" style="width: 100%; margin-top: 14px; font-size: 12px; padding: 8px;">
+            Ask AI For Food Recommendations &rarr;
+          </button>
+        </div>
+
+        <!-- AI Travel Assistant Card -->
+        <div class="detail-ai-callout">
+          <div style="font-size: 22px; margin-bottom: 6px;">🤖</div>
+          <h4 class="detail-ai-title">Have questions about ${item.name || title}?</h4>
+          <p class="detail-ai-desc">SafeTrip AI knows history, tickets, crowd density, safe walking paths, and transport costs.</p>
+          <button class="btn-sidebar-ai" onclick="openSafetyAIPanel('Tell me everything a tourist should know before visiting ${title}')">
+            Chat with Safety AI &rarr;
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  if (updateHash && window.location.hash !== `#explore/detail/${id}`) {
+    history.pushState(null, "", `#explore/detail/${id}`);
+  }
+
+  const section = document.getElementById("explore");
+  if (section && typeof section.scrollIntoView === "function") {
+    section.scrollIntoView({ behavior: "smooth" });
+  }
+}
+
+function backToExploreCategories() {
+  const catView = document.getElementById("exploreCategoryView");
+  const detailView = document.getElementById("exploreDetailView");
+  if (catView) catView.style.display = "block";
+  if (detailView) detailView.style.display = "none";
+
+  renderExploreCategoryView(currentExploreCategory);
+
+  if (window.location.hash !== `#explore/${currentExploreCategory}`) {
+    history.pushState(null, "", `#explore/${currentExploreCategory}`);
+  }
+
+  const section = document.getElementById("explore");
+  if (section && typeof section.scrollIntoView === "function") {
+    section.scrollIntoView({ behavior: "smooth" });
+  }
+}
+
+function addExploreDestinationToTrip(destId) {
+  let dest = null;
+  if (window.SafeTripExplore) {
+    dest = SafeTripExplore.getDestinationById(destId);
+  }
+  if (!dest && SafeTripData.destinations) {
+    dest = SafeTripData.destinations.find(d => d.id === destId);
+  }
+  if (!dest) return;
+
+  SafeTripStore.addToMyTrip({
+    id: `trip-d-${dest.id}-${Date.now()}`,
+    title: dest.title || dest.name,
+    type: "destination",
+    day: "Day 1",
+    time: "Morning",
+    estCost: dest.estimatedBudget || "₹300",
+    safetyScore: dest.safetyScore || 92
+  });
+
+  if (typeof showToastNotification === "function") {
+    showToastNotification(`✓ Added "${dest.name || dest.title}" to My Trip!`);
+  }
+}
+
+function addExploreExperienceToTrip(expId) {
+  let exp = null;
+  if (window.SafeTripExplore) {
+    exp = SafeTripExplore.getExperienceById(expId);
+  }
+  if (!exp && SafeTripData.experiences) {
+    exp = SafeTripData.experiences.find(e => e.id === expId);
+  }
+  if (!exp) return;
+
+  SafeTripStore.addToMyTrip({
+    id: `trip-e-${exp.id}-${Date.now()}`,
+    title: exp.title,
+    type: "experience",
+    day: "Day 2",
+    time: exp.recommendedTime ? exp.recommendedTime.split("–")[0].trim() : "02:00 PM",
+    estCost: exp.priceEst || "₹600",
+    safetyScore: exp.safetyScore || 92
+  });
+
+  if (typeof showToastNotification === "function") {
+    showToastNotification(`✓ Added "${exp.title}" to My Trip!`);
+  }
+}
+
+function focusOnMapCoords(lat, lng, name) {
+  if (window.safetyMap && typeof window.safetyMap.flyTo === "function") {
+    window.safetyMap.flyTo([lat, lng], 16, { duration: 1.2 });
+  }
+}
+
+// Backward compatibility helper
+function openDestinationDetails(destId) {
+  openDestinationDetailView(destId);
+}
+
+// Global Exports
+window.toggleExploreDropdown = toggleExploreDropdown;
+window.openExploreDropdown = openExploreDropdown;
+window.closeExploreDropdown = closeExploreDropdown;
+window.handleExploreMenuSelect = handleExploreMenuSelect;
+window.selectExploreCategory = selectExploreCategory;
+window.openDestinationDetailView = openDestinationDetailView;
+window.backToExploreCategories = backToExploreCategories;
+window.addExploreDestinationToTrip = addExploreDestinationToTrip;
+window.addExploreExperienceToTrip = addExploreExperienceToTrip;
+window.focusOnMapCoords = focusOnMapCoords;
+window.openDestinationDetails = openDestinationDetails;
 
 /* ==========================================================================
    SAFEST ROUTE SWITCHER
