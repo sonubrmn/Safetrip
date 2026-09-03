@@ -9,7 +9,12 @@ document.addEventListener("DOMContentLoaded", () => {
     initSafetyMap();
   }
 
-  // 2. Initialize UI Components
+  // 2. Initialize SafeTrip AI Companion
+  if (window.SafeTripAI) {
+    SafeTripAI.init();
+  }
+
+  // 3. Initialize UI Components
   initSafetyStatusWidget();
   initDestinationCards();
   initRouteSelector();
@@ -18,8 +23,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initCheckInWidget();
   initSOSFlow();
   initSearchInteractions();
+  renderMyTripSection();
 
-  // 3. Bind Global Store Events to UI
+  // 4. Bind Global Store Events to UI
   bindStoreEvents();
 });
 
@@ -95,10 +101,114 @@ function initSearchInteractions() {
 /* ==========================================================================
    DESTINATION CARDS & DETAILS MODAL
    ========================================================================== */
+let currentExploreCategory = "all";
+
 function initDestinationCards() {
+  const filterContainer = document.getElementById("exploreCategoryFilter");
+  if (filterContainer) {
+    const buttons = filterContainer.querySelectorAll(".explore-cat-btn");
+    buttons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        buttons.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentExploreCategory = btn.getAttribute("data-category") || "all";
+        renderExploreGrid();
+      });
+    });
+  }
+
+  renderExploreGrid();
+}
+
+function renderExploreGrid() {
   const grid = document.getElementById("destinationCardsGrid");
   if (!grid) return;
 
+  if (currentExploreCategory === "experiences") {
+    grid.innerHTML = SafeTripData.experiences.map(exp => `
+      <article class="destination-card" data-id="${exp.id}">
+        <div class="card-img-wrapper" style="background: linear-gradient(135deg, #0f172a, #334155);">
+          <img class="card-img" src="${exp.image}" alt="${exp.title}" loading="lazy" onerror="this.onerror=null; this.src=getDestinationFallbackSvg('${exp.title}', '${exp.statusClass}');">
+          <div class="card-score-badge ${exp.statusClass}">
+            <span>🎨</span>
+            <span class="score-val">${exp.safetyScore}</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-header-row">
+            <h3 class="card-title">${exp.title}</h3>
+            <span class="card-distance">${exp.duration}</span>
+          </div>
+          <p class="card-location">${exp.location}</p>
+          <div style="font-size: 13px; font-weight: 700; color: #0284c7; margin: 4px 0;">${exp.priceEst}</div>
+          <p style="font-size: 12px; color: #475569; line-height: 1.4; margin-bottom: 8px;">${exp.description}</p>
+          <div class="card-footer">
+            <span style="font-size: 11.5px; color: #059669; font-weight: 600;">🛡️ Verified Guild</span>
+            <button class="btn-card-details" onclick="SafeTripAI.addExperienceToTrip('${exp.id}')">
+              + Add to Trip
+            </button>
+          </div>
+        </div>
+      </article>
+    `).join("");
+    return;
+  }
+
+  if (currentExploreCategory === "food") {
+    grid.innerHTML = SafeTripData.localFoods.map(food => `
+      <article class="destination-card" data-id="${food.id}">
+        <div class="card-body" style="padding: 20px;">
+          <div class="card-header-row">
+            <h3 class="card-title">${food.name}</h3>
+            <span class="diet-tag ${food.dietaryClass}">● ${food.dietary}</span>
+          </div>
+          <div style="font-size: 12px; color: #64748b; margin: 2px 0;">${food.hindiName} • <b>${food.priceEst}</b></div>
+          <p style="font-size: 12.5px; color: #334155; margin: 8px 0; line-height: 1.45;">${food.description}</p>
+          <div style="font-size: 12px; color: #0284c7; margin: 4px 0;">
+            📍 <b>Famous At:</b> ${food.famousAt}
+          </div>
+          <div style="font-size: 11.5px; color: #059669; margin: 4px 0;">
+            🛡️ <b>Safety Intel:</b> ${food.safetyNote}
+          </div>
+          <div class="card-footer" style="margin-top: 14px;">
+            <button class="btn-card-details" onclick="openSafetyAIPanel('Tell me where to eat authentic ${food.name}')">
+              Ask AI Where to Eat &rarr;
+            </button>
+          </div>
+        </div>
+      </article>
+    `).join("");
+    return;
+  }
+
+  if (currentExploreCategory === "stays") {
+    grid.innerHTML = SafeTripData.accommodations.map(stay => `
+      <article class="destination-card" data-id="${stay.id}">
+        <div class="card-body" style="padding: 20px;">
+          <div class="card-header-row">
+            <h3 class="card-title">${stay.name}</h3>
+            <span style="font-weight: 800; color: #0284c7; font-size: 13px;">${stay.priceNight}</span>
+          </div>
+          <p class="card-location">${stay.distance} • ⭐ ${stay.rating}</p>
+          <div class="card-status-badge ${stay.statusClass}">
+            ● Safety Score: ${stay.safetyScore}/100
+          </div>
+          <p style="font-size: 12px; color: #334155; margin: 6px 0;">${stay.whyRecommended}</p>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
+            <span style="font-size: 11px; background: #ecfdf5; color: #059669; padding: 2px 6px; border-radius: 4px;">✓ ${stay.cancellation}</span>
+          </div>
+          <div class="card-footer" style="margin-top: 14px;">
+            <button class="btn-card-details" onclick="SafeTripAI.openDemoReservation('${stay.name}')">
+              Reserve Demo
+            </button>
+          </div>
+        </div>
+      </article>
+    `).join("");
+    return;
+  }
+
+  // Default: Places
   grid.innerHTML = SafeTripData.destinations.map(dest => `
     <article class="destination-card" data-id="${dest.id}">
       <div class="card-img-wrapper" style="background: linear-gradient(135deg, #0f172a, #334155);">
@@ -158,13 +268,16 @@ function openDestinationDetails(destId) {
 
     <div>
       <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Security Assets Present</div>
-      <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px;">
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
         ${dest.features.map(f => `
           <li style="font-size: 12.5px; color: #334155; display: flex; align-items: center; gap: 8px;">
             <span style="color: #10b981; font-weight: bold;">✓</span> ${f}
           </li>
         `).join("")}
       </ul>
+      <button class="btn-res-action primary" onclick="closeAllModals(); openSafetyAIPanel('What is ${dest.name} famous for?');" style="width: 100%; padding: 10px 16px; font-size: 13px; font-weight: 600;">
+        ✨ Ask AI Travel Companion About ${dest.name}
+      </button>
     </div>
   `;
 
@@ -208,7 +321,7 @@ function initSafetyAIAssistant() {
   const closeBtn = document.getElementById("btnCloseAiPanel");
   const form = document.getElementById("aiInputForm");
   const input = document.getElementById("aiTextInput");
-  const chips = document.querySelectorAll(".ai-chip");
+  const langSelect = document.getElementById("aiLanguageSelect");
 
   if (fab && panel) {
     fab.addEventListener("click", () => {
@@ -219,6 +332,23 @@ function initSafetyAIAssistant() {
   if (closeBtn && panel) {
     closeBtn.addEventListener("click", () => {
       panel.classList.remove("open");
+    });
+  }
+
+  if (langSelect && window.SafeTripAI) {
+    langSelect.value = SafeTripAI.getLanguage();
+    langSelect.addEventListener("change", (e) => {
+      const selected = e.target.value;
+      SafeTripAI.setLanguage(selected);
+      const conf = SafeTripAI.langConfig[selected] || SafeTripAI.langConfig.en;
+      const chatBody = document.getElementById("aiChatBody");
+      if (chatBody) {
+        const bubble = document.createElement("div");
+        bubble.className = "chat-bubble assistant";
+        bubble.innerHTML = `<b>${conf.flag} ${conf.name}:</b> ${conf.greeting}`;
+        chatBody.appendChild(bubble);
+        chatBody.scrollTop = chatBody.scrollHeight;
+      }
     });
   }
 
@@ -233,9 +363,10 @@ function initSafetyAIAssistant() {
     });
   }
 
-  chips.forEach(chip => {
+  // Suggestion chips
+  document.querySelectorAll(".ai-chip").forEach(chip => {
     chip.addEventListener("click", () => {
-      const query = chip.textContent.trim();
+      const query = chip.getAttribute("data-query") || chip.textContent.trim();
       handleUserAIMessage(query);
     });
   });
@@ -261,18 +392,27 @@ function handleUserAIMessage(userText) {
   chatBody.appendChild(userBubble);
   chatBody.scrollTop = chatBody.scrollHeight;
 
-  // Simulated typing delay
+  // Simulated thinking delay with sleek loading state
   const typingBubble = document.createElement("div");
   typingBubble.className = "chat-bubble assistant";
-  typingBubble.textContent = "Analyzing safety telemetry...";
+  typingBubble.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #0284c7;">
+      <span class="pulse-dot" style="background: #0284c7;"></span>
+      <span>SafeTrip AI reasoning with Jaipur intelligence & safety grid...</span>
+    </div>
+  `;
   chatBody.appendChild(typingBubble);
   chatBody.scrollTop = chatBody.scrollHeight;
 
   setTimeout(() => {
-    const reply = generateContextualSafetyReply(userText);
-    typingBubble.textContent = reply;
+    if (window.SafeTripAI) {
+      const replyHtml = SafeTripAI.processMessage(userText);
+      typingBubble.innerHTML = replyHtml;
+    } else {
+      typingBubble.textContent = "SafeTrip AI companion ready.";
+    }
     chatBody.scrollTop = chatBody.scrollHeight;
-  }, 700);
+  }, 650);
 }
 
 function generateContextualSafetyReply(query) {
@@ -564,7 +704,49 @@ function bindStoreEvents() {
 
   SafeTripEvents.on("state:synced", () => {
     updateStatusCardUI(SafeTripStore.getTourist());
+    renderMyTripSection();
   });
+
+  SafeTripEvents.on("mytrip:updated", () => {
+    renderMyTripSection();
+  });
+}
+
+function renderMyTripSection() {
+  const container = document.getElementById("myTripItemsList");
+  if (!container) return;
+
+  const items = SafeTripStore.getMyTrip();
+  if (!items.length) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 24px; color: #64748b; font-size: 13px;">
+        No planned items in your trip yet. Ask SafeTrip AI: <i>"Plan Jaipur for 3 days"</i> or click <b>"+ Add to Trip"</b> on any experience card above!
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = items.map(item => `
+    <div class="mytrip-item-row" data-id="${item.id}">
+      <div class="mytrip-item-left">
+        <span class="mytrip-type-icon">${item.type === 'experience' ? '🎨' : (item.type === 'food' ? '🍲' : (item.type === 'budget' ? '💰' : (item.type === 'itinerary' ? '🗺️' : '🏛️')))}</span>
+        <div>
+          <b style="font-size: 13.5px; color: #0f172a;">${item.title}</b>
+          <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">
+            ${item.day} • ${item.time} • Est. <b>${item.estCost}</b>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 11px; font-weight: 700; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 2px 8px; border-radius: 9999px;">
+          Score: ${item.safetyScore}/100
+        </span>
+        <button class="btn-del-zone" onclick="SafeTripStore.removeFromMyTrip('${item.id}')" title="Remove from Trip" style="font-size: 11px; padding: 3px 8px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 6px;">
+          ✕ Remove
+        </button>
+      </div>
+    </div>
+  `).join("");
 }
 
 // Modal helper to close via backdrop click
@@ -578,3 +760,4 @@ document.addEventListener("click", (e) => {
 window.openDestinationDetails = openDestinationDetails;
 window.closeAllModals = closeAllModals;
 window.openSafetyAIPanel = openSafetyAIPanel;
+window.renderMyTripSection = renderMyTripSection;
