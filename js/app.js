@@ -404,15 +404,17 @@ function handleUserAIMessage(userText) {
   chatBody.appendChild(typingBubble);
   chatBody.scrollTop = chatBody.scrollHeight;
 
-  setTimeout(() => {
+  setTimeout(async () => {
     if (window.SafeTripAI) {
-      const replyHtml = SafeTripAI.processMessage(userText);
+      const replyHtml = window.SafeTripAI.processMessageAsync 
+        ? await window.SafeTripAI.processMessageAsync(userText)
+        : window.SafeTripAI.processMessage(userText);
       typingBubble.innerHTML = replyHtml;
     } else {
       typingBubble.textContent = "SafeTrip AI companion ready.";
     }
     chatBody.scrollTop = chatBody.scrollHeight;
-  }, 650);
+  }, 450);
 }
 
 function generateContextualSafetyReply(query) {

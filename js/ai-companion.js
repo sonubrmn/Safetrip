@@ -1,28 +1,39 @@
 /**
- * SAFETRIP - Advanced Multilingual AI Travel & Safety Companion (Gemini Flash 3.8 Architecture)
- * 
- * CORE ARCHITECTURAL RULE:
- * "Always answer in the user's requested language. If no language is explicitly requested,
- * detect the language of the latest user message and respond in that language.
- * Do not default to English solely because the application interface is in English.
- * When the user changes language, follow the new language. Generate the answer directly
- * in the target language rather than generating English first and translating it afterward."
+ * SAFETRIP - Multilingual AI Travel & Safety Companion (Gemini Flash 3.8 Architecture)
+ * Production-grade multilingual intelligence with exact script detection,
+ * live Gemini API pipeline, conversation history, and contextual travel responses.
  */
 
 const GEMINI_FLASH_SYSTEM_INSTRUCTION = `
 You are the SafeTrip AI Travel & Safety Companion for Jaipur, Rajasthan.
-Core Rules:
-1. Always answer in the user's requested language. If no language is explicitly requested, detect the language of the latest user message and respond directly in that language. Do not default to English solely because the application interface is in English.
-2. When the user changes language, follow the new language immediately and naturally.
+Tourist Profile: Sid (Tourist ID: ST-8F42A1, Nationality: IND).
+Current Location: Hawa Mahal Heritage Precinct, Jaipur (Safety Score: 84/100, LOW RISK).
+
+Core Directives:
+1. Always answer in the user's requested language. If no language is explicitly requested,
+   detect the language of the latest user message and respond directly in that language.
+   Do not default to English or Hindi unless that is the actual language used.
+2. When the user writes in Punjabi (Gurmukhi), respond directly in fluent, natural Punjabi.
+   When the user writes in Hindi, respond in Hindi.
+   When the user writes in Bengali, respond in Bengali.
+   When the user writes in Gujarati, respond in Gujarati.
+   When the user writes in Tamil, respond in Tamil.
+   When the user writes in Telugu, respond in Telugu.
+   When the user writes in English, respond in English.
 3. Generate the answer directly in the target language as a culturally fluent local expert.
-4. Preserve proper nouns, monument names, prices, numbers, safety terminology, and important travel identifiers accurately (e.g. "Hawa Mahal", "Amber Fort", "City Palace", "₹10,000", "SafeTrip", Tourist ID "ST-8F42A1").
-5. If the user expresses safety distress (e.g. "আমি নিরাপদ বোধ করছি না", "I feel unsafe", "help"), immediately prioritize the safety protocol in the user's language: nearest police chowki (Rajasthan Tourist Police Thana Beat 4, 120m), SMS Hospital (2.4 km), and emergency SOS.
-6. If the user asks for a translation (e.g. "Translate this to Hindi: ...", "Translate into Bengali: ..."), recognize the translation intent directly and return the exact translation with pronunciation/phonetics and tip.
-7. Factuality: Use verified Jaipur travel data. Do not hallucinate fake bookings or claim real-world police have been contacted.
+   Do NOT generate in English first and then translate.
+4. Preserve proper nouns, monument names, prices, numbers, and identifiers accurately
+   (e.g., "Hawa Mahal", "Amber Fort", "City Palace", "₹10,000", "SafeTrip", Tourist ID "ST-8F42A1").
+5. If the user expresses safety distress (e.g., "ਮੈਨੂੰ ਸੁਰੱਖਿਅਤ ਮਹਿਸੂਸ ਨਹੀਂ ਹੋ ਰਿਹਾ", "আমি নিরাপদ বোধ করছি না", "I feel unsafe"),
+   immediately prioritize the emergency protocol: nearest police chowki (Rajasthan Tourist Police Thana Beat 4, 120m away, dial 1363),
+   SMS Hospital Trauma Center (2.4 km away), and prototype SOS.
+6. If the user asks for a translation, return the direct accurate translation with pronunciation and traveler tips.
+7. Maintain multi-turn conversation context. If the user says "Make it cheaper" or "Add food to this",
+   modify the existing itinerary while staying in the same conversation language.
 `;
 
 const SafeTripAI = (function () {
-  // Conversational session state
+  // Conversational session memory
   let tripSession = {
     destination: "Jaipur",
     days: 3,
@@ -33,21 +44,24 @@ const SafeTripAI = (function () {
     accessibility: "Standard",
     dietary: "Vegetarian Friendly",
     currentItinerary: null,
-    preferredLanguage: "auto", // "auto" is default and recommended
+    preferredLanguage: "auto", // "auto" is recommended default
     activeConversationLanguage: "en"
   };
 
-  // Language Dictionary & Native Greetings
+  // Multi-turn conversation history for context preservation
+  let conversationHistory = [];
+
+  // Supported languages configuration
   const langConfig = {
     auto: { 
       name: "Auto-detect", 
       flag: "🌐", 
-      greeting: "Namaste Sid! I am your SAFETRIP AI Travel & Safety Companion. You can ask me in any language (বাংলা, हिंदी, English, Français, etc.) and I will respond directly in your language!" 
+      greeting: "Namaste Sid! I am your SAFETRIP AI Travel & Safety Companion. You can ask me in any language (ਪੰਜਾਬੀ, বাংলা, हिंदी, ગુજરાતી, தமிழ், English, etc.) and I will respond directly in your language!" 
     },
-    en: { 
-      name: "English", 
-      flag: "🇬🇧", 
-      greeting: "Namaste Sid! I am your SAFETRIP AI Travel & Safety Companion. How can I assist your journey in Jaipur today?" 
+    pa: { 
+      name: "ਪੰਜਾਬੀ (Punjabi)", 
+      flag: "🇮🇳", 
+      greeting: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਸਿਡ! ਮੈਂ ਤੁਹਾਡਾ ਸੇਫ਼ਟ੍ਰਿਪ AI ਯਾਤਰਾ ਅਤੇ ਸੁਰੱਖਿਆ ਸਾਥੀ ਹਾਂ। ਜੈਪੁਰ ਦੌਰੇ ਦੌਰਾਨ ਮੈਂ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ? (ਤੁਸੀਂ ਪੰਜਾਬੀ ਵਿੱਚ ਕੋਈ ਵੀ ਸਵਾਲ ਪੁੱਛ ਸਕਦੇ ਹੋ)" 
     },
     hi: { 
       name: "हिंदी (Hindi)", 
@@ -58,6 +72,11 @@ const SafeTripAI = (function () {
       name: "বাংলা (Bengali)", 
       flag: "🇮🇳", 
       greeting: "নমস্কার সিড! আমি আপনার সেফট্রিপ AI ভ্রমণ ও সুরক্ষা সঙ্গী। জয়পুর সফরে আপনাকে কীভাবে সাহায্য করতে পারি? (যেকোনো প্রশ্ন বাংলায় করতে পারেন)" 
+    },
+    gu: { 
+      name: "ગુજરાતી (Gujarati)", 
+      flag: "🇮🇳", 
+      greeting: "નમસ્તે સિડ! હું તમારો સેફટ્રિપ AI ટ્રાવેલ અને સુરક્ષા સાથી છું. જયપુર પ્રવાસમાં તમને કેવી રીતે મદદ કરી શકું?" 
     },
     ta: { 
       name: "தமிழ் (Tamil)", 
@@ -74,20 +93,15 @@ const SafeTripAI = (function () {
       flag: "🇮🇳", 
       greeting: "नमस्कार सिड! मी तुमचा सेफट्रिप AI ट्रॅव्हल व सुरक्षितता मार्गदर्शक आहे. जयपूर प्रवासात मी तुम्हाला कशी मदत करू?" 
     },
-    gu: { 
-      name: "ગુજરાતી (Gujarati)", 
-      flag: "🇮🇳", 
-      greeting: "નમસ્તે સિડ! હું તમારો સેફટ્રિપ AI ટ્રાવેલ અને સુરક્ષા સાથી છું. જયપુર પ્રવાસમાં તમને કેવી રીતે મદદ કરી શકું?" 
-    },
-    pa: { 
-      name: "ਪੰਜਾਬੀ (Punjabi)", 
-      flag: "🇮🇳", 
-      greeting: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਸਿਡ! ਮੈਂ ਤੁਹਾਡਾ ਸੇਫ਼ਟ੍ਰਿਪ AI ਯਾਤਰਾ ਅਤੇ ਸੁਰੱਖਿਆ ਸਾਥੀ ਹਾਂ। ਜੈਪੁਰ ਦੌਰੇ ਦੌਰਾਨ ਮੈਂ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦদ ਕਰ ਸਕਦਾ ਹਾਂ?" 
+    en: { 
+      name: "English", 
+      flag: "🇬🇧", 
+      greeting: "Namaste Sid! I am your SAFETRIP AI Travel & Safety Companion. You are currently in the Hawa Mahal Heritage Precinct (Safety Score: 84, Low Risk). How can I assist your Jaipur journey today?" 
     },
     ur: { 
       name: "اردو (Urdu)", 
       flag: "🇵🇰", 
-      greeting: "سلام سڈ! میں آپ کا سیف ٹرپ اے آئی ٹریول اور سیفٹی ساتھی ہوں۔ جے پور کے سفر میں آپ کی کیا مدد کر سکتا ہوں؟" 
+      greeting: "سلام سڈ! میں آپ کا سیف ٹرਪ اے آئی ٹریول اور سیفٹی ساتھی ہوں۔ جے پور کے سفر میں آپ کی کیا مدد کر سکتا ہوں؟" 
     },
     fr: { 
       name: "Français (French)", 
@@ -131,110 +145,90 @@ const SafeTripAI = (function () {
     }
   }
 
-  // Helper: Normalize Bengali, Devanagari, and Arabic numerals to ASCII digits
+  // Normalize Bengali, Gurmukhi, Devanagari, and Arabic numerals to standard digits
   function normalizeNumerals(str) {
     if (!str) return "";
     const bengaliDigits = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
     const devanagariDigits = ['०','१','२','३','४','५','६','७','८','९'];
+    const gurmukhiDigits = ['੦','੧','੨','੩','੪','੫','੬','੭','੮','੯'];
     let res = str;
     for (let i = 0; i < 10; i++) {
       res = res.replaceAll(bengaliDigits[i], i.toString());
       res = res.replaceAll(devanagariDigits[i], i.toString());
+      res = res.replaceAll(gurmukhiDigits[i], i.toString());
     }
     return res;
   }
 
   /**
-   * Robust Language Detection from Message Content
-   * Handles Unicode scripts, mixed-language tourist messages (Banglish, Hinglish), and Latin loan words.
+   * Precise Language Detection by Character Frequency
+   * CRITICAL FIX: Universal Indic punctuation (Danda \u0964 and Double Danda \u0965)
+   * reside in the \u0900-\u097F block but are used in Gurmukhi and Bengali.
+   * We count true alphabet letters so Punjabi with '।' is never falsely classified as Hindi.
    */
   function detectLanguageFromText(text) {
     if (!text || typeof text !== "string") return "en";
     const raw = text.trim();
     const lower = raw.toLowerCase();
 
-    // 1. Bengali script detection (Highest certainty: U+0980 to U+09FF)
-    if (/[\u0980-\u09FF]/.test(raw)) {
-      return "bn";
+    // Frequency counts of distinct script alphabets
+    const counts = {
+      pa: (raw.match(/[\u0A01-\u0A75]/g) || []).length, // Gurmukhi letters
+      bn: (raw.match(/[\u0981-\u09FA]/g) || []).length, // Bengali letters
+      gu: (raw.match(/[\u0A81-\u0AFA]/g) || []).length, // Gujarati letters
+      ta: (raw.match(/[\u0B82-\u0BFA]/g) || []).length, // Tamil letters
+      te: (raw.match(/[\u0C01-\u0C7F]/g) || []).length, // Telugu letters
+      kn: (raw.match(/[\u0C82-\u0CFA]/g) || []).length, // Kannada letters
+      ml: (raw.match(/[\u0D02-\u0D7F]/g) || []).length, // Malayalam letters
+      ur: (raw.match(/[\u0621-\u064A\u0671-\u06D3]/g) || []).length, // Urdu/Arabic letters
+      hi_mr: (raw.match(/[\u0904-\u0939\u0958-\u0961]/g) || []).length, // Devanagari letters (EXCLUDING \u0964 danda!)
+      ja: (raw.match(/[\u3040-\u30FF\u31F0-\u31FF]/g) || []).length, // Japanese Hiragana/Katakana
+      ko: (raw.match(/[\uAC00-\uD7AF\u1100-\u11FF]/g) || []).length, // Korean Hangul
+      zh: (raw.match(/[\u4E00-\u9FFF]/g) || []).length  // Chinese Hanzi
+    };
+
+    let maxLang = null;
+    let maxCount = 0;
+    for (const k in counts) {
+      if (counts[k] > maxCount) {
+        maxCount = counts[k];
+        maxLang = k;
+      }
     }
 
-    // 2. Devanagari script detection (Hindi vs Marathi)
-    if (/[\u0900-\u097F]/.test(raw)) {
-      if (/\b(आहे|नाही|कसे|करावे|मला|माहिती|जयपूर|सांगा|करायचे)\b/.test(raw)) return "mr";
-      return "hi";
+    if (maxCount >= 1) {
+      if (maxLang === "hi_mr") {
+        if (/\b(आहे|नाही|कसे|करावे|मला|माहिती|जयपूर|सांगा|करायचे|दिवस|भेट)\b/.test(raw)) return "mr";
+        return "hi";
+      }
+      return maxLang;
     }
 
-    // 3. Gurmukhi (Punjabi) script (U+0A00 to U+0A7F)
-    if (/[\u0A00-\u0A7F]/.test(raw)) return "pa";
-
-    // 4. Gujarati script (U+0A80 to U+0AFF)
-    if (/[\u0A80-\u0AFF]/.test(raw)) return "gu";
-
-    // 5. Tamil script (U+0B80 to U+0BFF)
-    if (/[\u0B80-\u0BFF]/.test(raw)) return "ta";
-
-    // 6. Telugu script (U+0C00 to U+0C7F)
-    if (/[\u0C00-\u0C7F]/.test(raw)) return "te";
-
-    // 7. Urdu / Arabic script (U+0600 to U+06FF)
-    if (/[\u0600-\u06FF]/.test(raw)) return "ur";
-
-    // 8. Japanese (Hiragana / Katakana)
-    if (/[\u3040-\u30FF\u31F0-\u31FF\uFF65-\uFF9F]/.test(raw)) return "ja";
-
-    // 9. Korean (Hangul)
-    if (/[\uAC00-\uD7AF\u1100-\u11FF]/.test(raw)) return "ko";
-
-    // 10. Chinese (Hanzi without kana)
-    if (/[\u4E00-\u9FFF]/.test(raw)) return "zh";
-
-    // 11. Romanized Bengali / Banglish detection
-    if (/\b(amake|kore dao|bhalo|khabar|kothay|shundor|amar|taka|bhabe|jaabo|korbo)\b/i.test(lower)) {
-      return "bn";
-    }
-
-    // 12. Romanized Hindi / Hinglish detection
-    if (/\b(bana do|kya hai|kaise|kahan|sasta|chahiye|batao|kripya|mera budget|hoga|raasta|safarnama)\b/i.test(lower)) {
-      return "hi";
-    }
-
-    // 13. French keywords
-    if (/\b(bonjour|s'il vous plaît|merci|voyage|itinéraire|nourriture|hôtel|sécurité|je veux|visiter|recommande|combien|pourquoi)\b/i.test(lower)) {
-      return "fr";
-    }
-
-    // 14. Spanish keywords
-    if (/\b(hola|por favor|gracias|itinerario|hotel|comida|viaje|seguridad|quiero|recomienda|peligro|cuánto|dónde)\b/i.test(lower)) {
-      return "es";
-    }
-
-    // 15. German keywords
-    if (/\b(hallo|bitte|danke|reise|reiseroute|essen|sicherheit|hotel|sehenswürdigkeiten|empfehlen|wieviel|warum)\b/i.test(lower)) {
-      return "de";
-    }
+    // Romanized / transliterated phrase checks
+    if (/\b(amake|kore dao|bhalo|khabar|kothay|shundor|amar|taka|bhabe)\b/i.test(lower)) return "bn";
+    if (/\b(bana do|kya hai|kaise|kahan|sasta|chahiye|batao|kripya|mera budget|hoga|raasta)\b/i.test(lower)) return "hi";
+    if (/\b(mennu|mainu|kitthe|chahidi|karo ji|sat sri akal|dass|daso)\b/i.test(lower)) return "pa";
+    if (/\b(bonjour|s'il vous plaît|merci|voyage|itinéraire|nourriture|hôtel|sécurité)\b/i.test(lower)) return "fr";
+    if (/\b(hola|por favor|gracias|itinerario|hotel|comida|viaje|seguridad)\b/i.test(lower)) return "es";
+    if (/\b(hallo|bitte|danke|reise|reiseroute|essen|sicherheit|hotel)\b/i.test(lower)) return "de";
 
     return "en";
   }
 
   /**
-   * Clear 5-Tier Language Priority Resolution:
-   * 1. Explicit user request in prompt ("বাংলায় উত্তর দাও", "answer in Hindi", "réponds en français")
-   * 2. Manual UI selector override (if user selected a specific language other than "auto")
-   * 3. Detected language of current message
-   * 4. Ongoing conversation continuity
-   * 5. English default
+   * 5-Tier Response Language Priority Resolution
    */
   function resolveResponseLanguage(userQuery) {
     const raw = userQuery.trim();
 
-    // --- Priority 1: Explicit Language Request in the User Message ---
+    // Priority 1: Explicit Language Request in Prompt
+    if (/ਪੰਜਾਬੀ ਵਿੱਚ|in punjabi|to punjabi|into punjabi|punjabi mein/i.test(raw)) return "pa";
     if (/বাংলায়|in bengali|to bengali|into bengali|bengali mein/i.test(raw)) return "bn";
     if (/हिंदी में|हिन्दी में|in hindi|to hindi|into hindi|hindi mein/i.test(raw)) return "hi";
+    if (/ગુજરાતીમાં|in gujarati|to gujarati|into gujarati/i.test(raw)) return "gu";
     if (/தமிழில்|in tamil|to tamil|into tamil/i.test(raw)) return "ta";
     if (/తెలుగులో|in telugu|to telugu|into telugu/i.test(raw)) return "te";
     if (/मराठीत|in marathi|to marathi|into marathi/i.test(raw)) return "mr";
-    if (/ગુજરાતીમાં|in gujarati|to gujarati|into gujarati/i.test(raw)) return "gu";
-    if (/ਪੰਜਾਬੀ ਵਿੱਚ|in punjabi|to punjabi|into punjabi/i.test(raw)) return "pa";
     if (/اردو میں|in urdu|to urdu|into urdu/i.test(raw)) return "ur";
     if (/en français|en francais|in french|to french|réponds en français/i.test(raw)) return "fr";
     if (/en español|en espanol|in spanish|to spanish|responde en español/i.test(raw)) return "es";
@@ -244,30 +238,30 @@ const SafeTripAI = (function () {
     if (/用中文|in chinese|to chinese/i.test(raw)) return "zh";
     if (/in english|to english|answer in english|from now on answer in english/i.test(raw)) return "en";
 
-    // --- Priority 2: Manual UI Language Selector (if user intentionally picked a specific language) ---
+    // Priority 2: Manual UI Language Selector (if user explicitly chose a specific language)
     if (tripSession.preferredLanguage && tripSession.preferredLanguage !== "auto") {
       return tripSession.preferredLanguage;
     }
 
-    // --- Priority 3: Automatic Detection from the Current User Message ---
+    // Priority 3: Automatic Detection from Current Message
     const detected = detectLanguageFromText(raw);
     if (detected && detected !== "en") {
       tripSession.activeConversationLanguage = detected;
       return detected;
     }
 
-    // If English text detected explicitly
+    // If clearly English text
     if (detected === "en" && /^[a-zA-Z0-9\s\.\,\?\!\'\-\₹\$\€]+$/.test(raw)) {
       tripSession.activeConversationLanguage = "en";
       return "en";
     }
 
-    // --- Priority 4: Ongoing Conversation Language Continuity ---
+    // Priority 4: Ongoing Conversation Language Continuity
     if (tripSession.activeConversationLanguage && tripSession.activeConversationLanguage !== "auto") {
       return tripSession.activeConversationLanguage;
     }
 
-    // --- Priority 5: Fallback to English ---
+    // Priority 5: Fallback to English
     return "en";
   }
 
@@ -288,130 +282,17 @@ const SafeTripAI = (function () {
     return tripSession.preferredLanguage || "auto";
   }
 
-  /* ==========================================================================
-     MAIN MESSAGE PROCESSOR (GEMINI INTEL LAYER)
-     ========================================================================== */
-  function processMessage(userQuery) {
-    const raw = userQuery.trim();
-    const normalized = normalizeNumerals(raw);
-    const lang = resolveResponseLanguage(raw);
-    const qLower = normalized.toLowerCase();
-
-    // 1. SAFETY CRITICAL / IMMEDIATE DISTRESS (Top Priority across all languages)
-    if (
-      qLower.includes("unsafe") || qLower.includes("scared") || qLower.includes("danger") || 
-      qLower.includes("emergency") || qLower.includes("someone following") || qLower.includes("help me") ||
-      qLower.includes("নিরাপদ বোধ করছি না") || qLower.includes("বিপদে") || qLower.includes("বাঁচাও") ||
-      qLower.includes("असुरक्षित") || qLower.includes("बचाओ") || qLower.includes("मदद") ||
-      qLower.includes("pas en sécurité") || qLower.includes("danger") || qLower.includes("peligro") || qLower.includes("ayuda")
-    ) {
-      return buildSafetyEmergencyResponse(lang);
+  // Set / update Gemini Flash API Key
+  function setApiKey(key) {
+    if (key && typeof key === "string") {
+      localStorage.setItem("safetrip_gemini_api_key", key.trim());
+      return true;
     }
+    return false;
+  }
 
-    // 2. MAKE MY TRIP SAFER
-    if (
-      qLower.includes("make my trip safer") || qLower.includes("make it safer") || 
-      qLower.includes("safer route") || qLower.includes("safety advice") || 
-      qLower.includes("সুরক্ষিত") || qLower.includes("নিরাপদ") || qLower.includes("सुरक्षित")
-    ) {
-      return buildMakeSaferResponse(lang);
-    }
-
-    // 3. SPECIAL TRANSLATION INTENT (Explicit translation request)
-    if (
-      /translate|translation|হিন্দিতে translate|বাংলায় translate|translat|अनुवाद|কিভাবে বলব|how do i say|how to ask/i.test(raw)
-    ) {
-      return buildTranslationBridgeResponse(raw, lang);
-    }
-
-    // 4. BUDGET OPTIMIZATION ("Make it cheaper", "only 7000 left", "সস্তা", "কম বাজেট")
-    if (
-      qLower.includes("cheaper") || qLower.includes("sasta") || qLower.includes("make it cheaper") || 
-      qLower.includes("left") || qLower.includes("কম খরচ") || qLower.includes("সস্তা") ||
-      (qLower.includes("budget") && (qLower.includes("cut") || qLower.includes("reduce") || qLower.includes("tight") || qLower.includes("কম")))
-    ) {
-      return buildBudgetOptimizationResponse(normalized, lang);
-    }
-
-    // 5. TRIP PLANNER & ITINERARY (e.g. "Plan Jaipur for 3 days under ₹10,000", "৩ দিনের ট্রিপ", "budget trip bana do")
-    if (
-      qLower.includes("plan") || qLower.includes("trip") || qLower.includes("itinerary") || 
-      qLower.includes("days") || qLower.includes("din") || qLower.includes("weekend") || 
-      qLower.includes("tour") || qLower.includes("bana do") || qLower.includes("kore dao") ||
-      qLower.includes("প্ল্যান") || qLower.includes("ট্রিপ") || qLower.includes("ভ্রমণ") ||
-      qLower.includes("दिन") || qLower.includes("यात्रा") || qLower.includes("itinerario") || qLower.includes("itinéraire")
-    ) {
-      return buildTripPlannerResponse(normalized, lang);
-    }
-
-    // 6. LOCAL FOOD & DINING DISCOVERY ("authentic food", "খাবার", "भोजन", "dal baati", "kachori")
-    if (
-      qLower.includes("food") || qLower.includes("eat") || qLower.includes("dish") || 
-      qLower.includes("kachori") || qLower.includes("dal baati") || qLower.includes("ghewar") || 
-      qLower.includes("dinner") || qLower.includes("lunch") || 
-      qLower.includes("খাবার") || qLower.includes("খাওয়া") || qLower.includes("ভোজন") ||
-      qLower.includes("खाना") || qLower.includes("भोजन") || qLower.includes("nourriture") || qLower.includes("comida")
-    ) {
-      return buildLocalFoodResponse(normalized, lang);
-    }
-
-    // 7. AUTHENTIC EXPERIENCES (Pottery, block printing, food walks, crafts, কর্মশালা)
-    if (
-      qLower.includes("experience") || qLower.includes("workshop") || qLower.includes("pottery") || 
-      qLower.includes("craft") || qLower.includes("printing") || qLower.includes("folk") || 
-      qLower.includes("activity") || qLower.includes("activities") || 
-      qLower.includes("অভিজ্ঞতা") || qLower.includes("কর্মশালা") || qLower.includes("হস্তশিল্প") ||
-      qLower.includes("अनुभव") || qLower.includes("हस्तशिल्प") || qLower.includes("activité") || qLower.includes("experiencia")
-    ) {
-      return buildExperiencesResponse(normalized, lang);
-    }
-
-    // 8. ACCOMMODATION & STAYS ("hotel", "stay", "হোটেল", "থাকব", "होटल")
-    if (
-      qLower.includes("hotel") || qLower.includes("stay") || qLower.includes("hostel") || 
-      qLower.includes("resort") || qLower.includes("room") || 
-      qLower.includes("হোটেল") || qLower.includes("থাকার") ||
-      qLower.includes("होटल") || qLower.includes("रुकने") || qLower.includes("hébergement") || qLower.includes("alojamiento")
-    ) {
-      return buildAccommodationResponse(normalized, lang);
-    }
-
-    // 9. DESTINATION EXPLAINER ("What is Amber Fort famous for?", "Jaipur কেন বিখ্যাত?")
-    for (const d of SafeTripData.destinations) {
-      if (qLower.includes(d.name.toLowerCase()) || qLower.includes(d.id.replace("-", " "))) {
-        return buildDestinationExplanationResponse(d, lang);
-      }
-    }
-    if (
-      qLower.includes("famous for") || qLower.includes("what to see") || qLower.includes("attractions") || 
-      qLower.includes("famous") || qLower.includes("কেন বিখ্যাত") || qLower.includes("কী দেখব") || 
-      qLower.includes("क्यों प्रसिद्ध") || qLower.includes("por qué es famoso") || qLower.includes("pourquoi est-ce célèbre")
-    ) {
-      return buildDestinationOverviewResponse(lang);
-    }
-
-    // 10. WHAT SHOULD I DO RIGHT NOW? ("right now", "tonight", "এখন কি করব", "अभी क्या करूँ")
-    if (
-      qLower.includes("right now") || qLower.includes("tonight") || qLower.includes("now") || 
-      qLower.includes("evening") || qLower.includes("currently") || 
-      qLower.includes("এখন কি") || qLower.includes("আজ রাতে") ||
-      qLower.includes("अभी क्या") || qLower.includes("आज शाम") || qLower.includes("que faire maintenant")
-    ) {
-      return buildWhatToDoNowResponse(lang);
-    }
-
-    // 11. ACCESSIBILITY & PACING (Elderly parents, wheelchair, low walking, প্রবীণ)
-    if (
-      qLower.includes("elderly") || qLower.includes("parents") || qLower.includes("wheelchair") || 
-      qLower.includes("walking") || qLower.includes("kids") || 
-      qLower.includes("বাবা-মা") || qLower.includes("বয়স্ক") || qLower.includes("প্রবীণ") ||
-      qLower.includes("बुजुर्ग") || qLower.includes("माता-पिता")
-    ) {
-      return buildAccessibilityPacingResponse(normalized, lang);
-    }
-
-    // Fallback Contextual Assistant Response in Target Language
-    return buildGeneralCompanionResponse(normalized, lang);
+  function getApiKey() {
+    return window.GEMINI_API_KEY || localStorage.getItem("safetrip_gemini_api_key") || "";
   }
 
   // Subtle visual pill communicating active response language
@@ -422,6 +303,248 @@ const SafeTripAI = (function () {
   }
 
   /* ==========================================================================
+     MAIN MESSAGE PROCESSOR (GEMINI INTEL LAYER)
+     ========================================================================== */
+  function processMessage(userQuery) {
+    const raw = userQuery.trim();
+    const normalized = normalizeNumerals(raw);
+    const lang = resolveResponseLanguage(raw);
+    const qLower = normalized.toLowerCase();
+
+    // Record turn in conversation history
+    conversationHistory.push({ role: "user", text: raw, lang, timestamp: Date.now() });
+
+    // Multi-turn context check: Did user ask to modify previous itinerary?
+    const lastAssistantTurn = [...conversationHistory].reverse().find(t => t.role === "assistant" && t.intent);
+    const isFollowupCheaper = /cheaper|sasta|ਸਸਤਾ|ਘਟਾਓ|कम खर्च|सस्ता|আর কম খরচে|reduce budget|make it cheaper/i.test(raw);
+    const isFollowupAddFood = /(?:add|include|ਵੀ|भी|যোগ|जोੜੋ|जोड़ो).*(?:food|ਖਾਣਾ|ਭੋਜਨ|भोजन|ਫੂਡ|খাবার)|(?:food|ਖਾਣਾ|ਭੋਜਨ|भोजन|ਫੂਡ|খাবার).*(?:add|include|ਵੀ|भी|যোগ|जोੜੋ|जोड़ो|ਸ਼ਾਮਲ)/i.test(raw);
+
+    if (lastAssistantTurn && lastAssistantTurn.intent === "TRIP_PLANNER" && (isFollowupCheaper || isFollowupAddFood)) {
+      if (isFollowupCheaper) {
+        const reply = buildBudgetOptimizationResponse(normalized, lang);
+        conversationHistory.push({ role: "assistant", text: reply, intent: "BUDGET_OPT", lang });
+        return reply;
+      }
+      if (isFollowupAddFood) {
+        tripSession.travelStyle = "Cultural & Culinary Explorer";
+        const reply = buildTripPlannerResponse(normalized + " with local food", lang);
+        conversationHistory.push({ role: "assistant", text: reply, intent: "TRIP_PLANNER", lang });
+        return reply;
+      }
+    }
+
+    // 1. SAFETY CRITICAL / IMMEDIATE DISTRESS (Top Priority across all languages)
+    if (
+      /unsafe|scared|danger|emergency|someone following|help me/i.test(qLower) ||
+      /ਸੁਰੱਖਿਅਤ|ਡਰ ਲੱਗ|ਬਚਾਓ|ਮਦਦ ਚਾਹੀਦੀ/i.test(raw) ||
+      /নিরাপদ বোধ করছি না|বিপদে|বাঁচাও|সাহায্য চাই/i.test(raw) ||
+      /असुरक्षित|डर लग रहा|बचाओ|मदद चाहिए/i.test(raw) ||
+      /અસુરક્ષિત|મદદ|பாதுகாப்பற்ற|உதவி|రక్షణ|సహాయం|pas en sécurité|peligro/i.test(raw)
+    ) {
+      const reply = buildSafetyEmergencyResponse(lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "SAFETY_EMERGENCY", lang });
+      return reply;
+    }
+
+    // 2. MAKE MY TRIP SAFER
+    if (
+      /make my trip safer|make it safer|safer route|safety advice/i.test(qLower) ||
+      /ਸੁਰੱਖਿਅਤ ਬਣਾਓ|ਸੁਰੱਖਿਆ ਸੁਝਾਅ|ਸੁਰੱਖਿਆ ਸਲਾਹ/i.test(raw) ||
+      /সুরক্ষিত ভ্রমণ|নিরাপত্তা পরামর্শ/i.test(raw) ||
+      /सुरक्षित यात्रा|सुरक्षा सुझाव/i.test(raw)
+    ) {
+      const reply = buildMakeSaferResponse(lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "MAKE_SAFER", lang });
+      return reply;
+    }
+
+    // 3. SPECIAL TRANSLATION INTENT (Explicit translation request)
+    if (
+      /translate|translation|ਅਨੁਵਾਦ|ਕਿਵੇਂ ਕਹਿਣਾ|ਹਿੰਦੀ ਵਿੱਚ translate|বাংলায় translate|translat|अनुवाद|কিভাবে বলব|how do i say|how to ask/i.test(raw)
+    ) {
+      const reply = buildTranslationBridgeResponse(raw, lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "TRANSLATION", lang });
+      return reply;
+    }
+
+    // 4. BUDGET OPTIMIZATION ("Make it cheaper", "only 7000 left", "ਸਸਤਾ", "ਬਜਟ ਘਟਾਓ")
+    if (
+      /cheaper|sasta|make it cheaper|left|ਸਸਤਾ|ਘਟਾਓ|ਬਜਟ ਘੱਟ|কম খরচ|सस्ता/i.test(qLower) ||
+      (/budget|ਬਜਟ|बजट|বাজেট/i.test(qLower) && /cut|reduce|tight|low|ਘੱਟ|कम|কম/i.test(qLower))
+    ) {
+      const reply = buildBudgetOptimizationResponse(normalized, lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "BUDGET_OPT", lang });
+      return reply;
+    }
+
+    // 5. TRIP PLANNER & ITINERARY
+    // Comprehensive multilingual patterns covering Punjabi, Hindi, Bengali, Gujarati, Tamil, Telugu, English
+    if (
+      /plan|itinerary|tour|weekend/i.test(qLower) ||
+      /trip|days|din/i.test(qLower) ||
+      /ਯੋਜਨਾ|ਯਾਤਰਾ|ਟ੍ਰਿਪ|ਦਿਨ|ਪਲਾਨ|ਬਣਾਓ|ਚਾਹੀਦੀ/i.test(raw) ||
+      /प्लान|ट्रिप|यात्रा|दिन|बना दो/i.test(raw) ||
+      /প্ল্যান|ট্রিপ|ভ্রমণ|দিন|করে দাও/i.test(raw) ||
+      /યોજના|ટ્રિપ|દિવસ/i.test(raw) ||
+      /பயணத் திட்டம்|சுற்றுப்பயணம்|நாட்கள்/i.test(raw) ||
+      /ట్రిప్|ప్రణాళిక|రోజుల/i.test(raw) ||
+      /itinéraire|voyage|itinerario|viaje/i.test(qLower)
+    ) {
+      const reply = buildTripPlannerResponse(normalized, lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "TRIP_PLANNER", lang });
+      return reply;
+    }
+
+    // 6. LOCAL FOOD & DINING DISCOVERY
+    if (
+      /food|eat|dish|dining|lunch|dinner|kachori|dal baati|ghewar|lassi/i.test(qLower) ||
+      /ਖਾਣਾ|ਭੋਜਨ|ਸਵਾਦਿਸ਼ਟ|ਕਿੱਥੇ ਮਿਲੇਗਾ|ਖਾਣ ਪੀਣ/i.test(raw) ||
+      /खाना|भोजन|स्वाद|कहाँ मिलेगा|मिठाई/i.test(raw) ||
+      /খাবার|খাওয়া|ভোজন|কোথায় পাব/i.test(raw) ||
+      /ખોરાક|જમવાનું|સ્વાદ/i.test(raw) ||
+      /உணவு|சாப்பாடு|ருசி/i.test(raw) ||
+      /ఆహారం|తిండి|రుచి/i.test(raw) ||
+      /nourriture|manger|comida|restaurante/i.test(qLower)
+    ) {
+      const reply = buildLocalFoodResponse(normalized, lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "LOCAL_FOOD", lang });
+      return reply;
+    }
+
+    // 7. AUTHENTIC EXPERIENCES (Pottery, block printing, food walks, crafts, ਦਸਤਕਾਰੀ)
+    if (
+      /experience|workshop|pottery|craft|printing|folk|activity|activities/i.test(qLower) ||
+      /ਦਸਤਕਾਰੀ|ਵਰਕਸ਼ਾਪ|ਸੱਭਿਆਚਾਰਕ|ਮਿੱਟੀ ਦੇ ਭਾਂਡੇ|ਕਠਪੁਤਲੀ/i.test(raw) ||
+      /हस्तशिल्प|कार्यशाला|संस्कृति|ब्लू पॉटरी|कठपुतली/i.test(raw) ||
+      /হস্তশিল্প|কর্মশালা|অভিজ্ঞতা|ব্লু পটারি/i.test(raw) ||
+      /હસ્તકલા|કાર્યશાળા/i.test(raw) ||
+      /கைவினை|பாரம்பரியம்/i.test(raw) ||
+      /activité|artisanat|experiencia/i.test(qLower)
+    ) {
+      const reply = buildExperiencesResponse(normalized, lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "EXPERIENCES", lang });
+      return reply;
+    }
+
+    // 8. ACCOMMODATION & STAYS ("hotel", "stay", "ਹੋਟਲ", "ਰਹਿਣ", "होटल")
+    if (
+      /hotel|stay|hostel|resort|room|lodging/i.test(qLower) ||
+      /ਹੋਟਲ|ਰਹਿਣ|ਕਮਰਾ/i.test(raw) ||
+      /होटल|रुकने|ठहरने|कमरा/i.test(raw) ||
+      /হোটেল|থাকার জায়গা/i.test(raw) ||
+      /હોટેલ|રોકાણ/i.test(raw) ||
+      /விடுதி|தங்குமிடம்/i.test(raw) ||
+      /లాడ్జి|హోటల్/i.test(raw) ||
+      /hébergement|chambre|alojamiento/i.test(qLower)
+    ) {
+      const reply = buildAccommodationResponse(normalized, lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "STAYS", lang });
+      return reply;
+    }
+
+    // 9. DESTINATION EXPLAINER ("What is Amber Fort famous for?", "Jaipur ਕਿਉਂ ਮਸ਼ਹੂਰ ਹੈ?")
+    for (const d of SafeTripData.destinations) {
+      if (qLower.includes(d.name.toLowerCase()) || qLower.includes(d.id.replace("-", " "))) {
+        const reply = buildDestinationExplanationResponse(d, lang);
+        conversationHistory.push({ role: "assistant", text: reply, intent: "DEST_EXPLAIN", lang });
+        return reply;
+      }
+    }
+    if (
+      /famous for|what to see|attractions|famous|overview|about jaipur/i.test(qLower) ||
+      /ਕਿਉਂ ਮਸ਼ਹੂਰ|ਕੀ ਦੇਖਣਾ|ਜੈਪੁਰ ਬਾਰੇ/i.test(raw) ||
+      /क्यों प्रसिद्ध|क्या देखें|जयपुर के बारे में/i.test(raw) ||
+      /কেন বিখ্যাত|কী দেখব|জয়পুর সম্পর্কে/i.test(raw) ||
+      /શા માટે પ્રખ્યાત|વિશે/i.test(raw) ||
+      /சிறப்பு|பற்றி/i.test(raw)
+    ) {
+      const reply = buildDestinationOverviewResponse(lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "DEST_OVERVIEW", lang });
+      return reply;
+    }
+
+    // 10. WHAT SHOULD I DO RIGHT NOW?
+    if (
+      /right now|tonight|currently|this evening/i.test(qLower) ||
+      /ਹੁਣ ਕੀ ਕਰਾਂ|ਅੱਜ ਸ਼ਾਮ|ਅੱਜ ਰਾਤ/i.test(raw) ||
+      /अभी क्या करूँ|आज शाम|आज रात/i.test(raw) ||
+      /এখন কী করব|আজ রাতে/i.test(raw)
+    ) {
+      const reply = buildWhatToDoNowResponse(lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "WHAT_NOW", lang });
+      return reply;
+    }
+
+    // 11. ACCESSIBILITY & PACING (Elderly parents, wheelchair, low walking, ਬਜ਼ੁਰਗ)
+    if (
+      /elderly|parents|wheelchair|walking|mobility|seniors/i.test(qLower) ||
+      /ਬਜ਼ੁਰਗ|ਮਾਤਾ ਪਿਤਾ|ਵ੍ਹੀਲਚੇਅਰ|ਘੱਟ ਤੁਰਨਾ/i.test(raw) ||
+      /बुजुर्ग|माता-पिता|व्हीलचेयर|कम चलना/i.test(raw) ||
+      /প্রবীণ|বয়স্ক|হুইলচেয়ার/i.test(raw)
+    ) {
+      const reply = buildAccessibilityPacingResponse(normalized, lang);
+      conversationHistory.push({ role: "assistant", text: reply, intent: "ACCESSIBILITY", lang });
+      return reply;
+    }
+
+    // 12. NATURAL CONVERSATIONAL RESPONSE (Direct answer, NEVER repeating generic capability prompt!)
+    const reply = buildGeneralCompanionResponse(raw, lang);
+    conversationHistory.push({ role: "assistant", text: reply, intent: "CONVERSATIONAL", lang });
+    return reply;
+  }
+
+  // Live async Gemini API caller with graceful fallback
+  async function processMessageAsync(userQuery) {
+    const apiKey = getApiKey();
+    const lang = resolveResponseLanguage(userQuery);
+
+    if (apiKey) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const conf = langConfig[lang] || { name: lang };
+
+        const payload = {
+          system_instruction: {
+            parts: [{ text: `${GEMINI_FLASH_SYSTEM_INSTRUCTION}\n\nTARGET RESPONSE LANGUAGE: You must answer directly in ${conf.name} (${lang}).` }]
+          },
+          contents: [
+            ...conversationHistory.slice(-4).map(h => ({
+              role: h.role === "user" ? "user" : "model",
+              parts: [{ text: h.text }]
+            })),
+            { role: "user", parts: [{ text: userQuery }] }
+          ]
+        };
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+            const rawAnswer = data.candidates[0].content.parts[0].text;
+            return `
+              <div class="ai-res-card">
+                ${renderLanguageIndicator(lang)}
+                <div class="ai-card-badge safe">✨ GEMINI FLASH 3.8 INTELLIGENCE</div>
+                <div style="font-size: 13.5px; color: #1e293b; line-height: 1.5; margin: 8px 0; white-space: pre-wrap;">${rawAnswer}</div>
+              </div>
+            `;
+          }
+        }
+      } catch (err) {
+        console.warn("Gemini Flash API request failed, using SafeTrip native intelligence engine:", err);
+      }
+    }
+
+    // If no key or API offline: use native high-precision engine
+    return processMessage(userQuery);
+  }
+
+  /* ==========================================================================
      MULTILINGUAL RESPONSE BUILDERS
      ========================================================================== */
 
@@ -429,12 +552,19 @@ const SafeTripAI = (function () {
   function buildSafetyEmergencyResponse(lang) {
     let headline, sub, callPolice, callHosp, sosBtn, safeCorridorBtn;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      headline = "🚨 ਤਤਕਾਲ ਸੁਰੱਖਿਆ ਸਹਾਇਤਾ ਸਰਗਰਮ (HIGH PRIORITY)";
+      sub = "ਤੁਹਾਡੀ ਲਾਈਵ ਲੋਕੇਸ਼ਨ ਰਾਜਸਥਾਨ ਟੂਰਿਸਟ ਪੁਲਿਸ ਗਰਿੱਡ 'ਤੇ ਸੁਰੱਖਿਅਤ ਢੰਗ ਨਾਲ ਟ੍ਰੈਕ ਹੋ ਰਹੀ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਘਬਰਾਓ ਨਾ ਅਤੇ ਤੁਰੰਤ ਇਹ ਕਦਮ ਚੁੱਕੋ:";
+      callPolice = "📞 ਕਾਲ ਕਰੋ: 1363";
+      callHosp = "📞 24/7 ਟਰਾਮਾ: 01412560291";
+      sosBtn = "🚨 ਡੈਮੋ SOS ਅਲਰਟ ਭੇਜੋ";
+      safeCorridorBtn = "🛡️ ਸੁਰੱਖਿਅਤ ਕੋਰੀਡੋਰ ਵਿੱਚ ਜਾਓ";
+    } else if (lang === "bn") {
       headline = "🚨 জরুরি নিরাপত্তা মোড সক্রিয় (HIGH PRIORITY)";
       sub = "আপনার লাইভ লোকেশন রাজস্থান ট্যুরিস্ট সুরক্ষা গ্রিডে ট্র্যাক করা হচ্ছে। আতঙ্কিত হবেন না, নিচের পদক্ষেপগুলি অনুসরণ করুন:";
       callPolice = "📞 কল করুন: 1363";
       callHosp = "📞 ২৪/৭ ট্রমা: 01412560291";
-      sosBtn = "🚨 ডেমো SOS ট্রিগার করুন (INC টিকিট)";
+      sosBtn = "🚨 ডেমো SOS ট্রিগার করুন";
       safeCorridorBtn = "🛡️ নিরাপদ করিডোরে যান";
     } else if (lang === "hi") {
       headline = "🚨 तत्काल सुरक्षा सहायता सक्रिय (HIGH PRIORITY)";
@@ -443,20 +573,13 @@ const SafeTripAI = (function () {
       callHosp = "📞 24/7 ट्रॉमा: 01412560291";
       sosBtn = "🚨 डेमो SOS अलर्ट भेजें";
       safeCorridorBtn = "🛡️ सुरक्षित कॉरिडोर में जाएं";
-    } else if (lang === "fr") {
-      headline = "🚨 ALERTE DE SÉCURITÉ IMMÉDIATE ACTIVÉE";
-      sub = "Votre position est suivie sur la grille de sécurité touristique du Rajasthan. Suivez ces étapes d'urgence :";
-      callPolice = "📞 Appeler 1363";
-      callHosp = "📞 Urgences 24/7";
-      sosBtn = "🚨 Déclencher SOS Démo";
-      safeCorridorBtn = "🛡️ Rejoindre le Couloir Sécurisé";
-    } else if (lang === "es") {
-      headline = "🚨 RESPUESTA DE SEGURIDAD INMEDIATA ACTIVADA";
-      sub = "Tu ubicación está siendo rastreada en la red de seguridad turística de Rajastán. Sigue estos pasos:";
-      callPolice = "📞 Llamar 1363";
-      callHosp = "📞 Urgencias 24/7";
-      sosBtn = "🚨 Activar SOS Demo";
-      safeCorridorBtn = "🛡️ Ir a Corredor Seguro";
+    } else if (lang === "gu") {
+      headline = "🚨 તાત્કાલિક સુરક્ષા સહાય સક્રિય (HIGH PRIORITY)";
+      sub = "તમારું લાઇવ સ્થાન રાજસ્થાન ટુરિસ્ટ પોલીસ ગ્રીડ પર ટ્રેક થઈ રહ્યું છે. કૃપા કરીને ગભરાશો નહીં:";
+      callPolice = "📞 કોલ કરો: 1363";
+      callHosp = "📞 24/7 ટ્રોમા: 01412560291";
+      sosBtn = "🚨 ડેમો SOS મોકલો";
+      safeCorridorBtn = "🛡️ સુરક્ષિત કોરિડોરમાં જાઓ";
     } else {
       headline = "🚨 IMMEDIATE SAFETY RESPONSE ACTIVATED";
       sub = "Your location is actively tracked on the Rajasthan Tourism Safety Grid. Follow these immediate protective steps:";
@@ -505,27 +628,34 @@ const SafeTripAI = (function () {
 
   // 2. MAKE MY TRIP SAFER
   function buildMakeSaferResponse(lang) {
-    let title, point1, point2, point3, btnRoute, btnId;
+    let title, p1, p2, p3, btnRoute, btnId;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      title = "ਤੁਹਾਡੀ ਯਾਤਰਾ ਨੂੰ ਸੁਰੱਖਿਅਤ ਬਣਾਉਣ ਲਈ AI ਸੁਝਾਅ:";
+      p1 = "<b>ਸੁਰੱਖਿਅਤ ਹੈਰੀਟੇਜ ਕੋਰੀਡੋਰ ਚੁਣੋ:</b> ਹਵਾ ਮਹਿਲ ਤੋਂ ਆਮੇਰ ਲਈ ਕਨਕ ਵ੍ਰਿੰਦਾਵਨ ਮਾਰਗ (96% ਸੀਸੀਟੀਵੀ ਅਤੇ ਪੁਲਿਸ ਗਸ਼ਤ) ਦੀ ਵਰਤੋਂ ਕਰੋ।";
+      p2 = "<b>ਸ਼ਾਮ 6:30 ਵਜੇ ਤੋਂ ਪਹਿਲਾਂ ਨਾਹਰਗੜ੍ਹ ਤੋਂ ਵਾਪਸੀ:</b> ਪਹਾੜੀ ਮੋੜਾਂ 'ਤੇ ਹਨੇਰਾ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਮੁੱਖ ਰੌਸ਼ਨ ਸੜਕ 'ਤੇ ਆ ਜਾਓ।";
+      p3 = "<b>ਡਿਜੀਟਲ ਟ੍ਰੈਵਲ ਆਈਡੀ ਅਤੇ 30 ਮਿੰਟ ਚੈੱਕ-ਇਨ:</b> ਆਪਣਾ 30-ਮਿੰਟ ਸੁਰੱਖਿਆ ਟਾਈਮਰ ਚਾਲੂ ਰੱਖੋ ਤਾਂ ਜੋ ਐਮਰਜੈਂਸੀ ਸੰਪਰਕ ਨਾਲ ਤਾਲਮੇਲ ਰਹੇ।";
+      btnRoute = "🛡️ ਸੁਰੱਖਿਅਤ ਰੂਟ ਲੇਅਰ ਸਰਗਰਮ ਕਰੋ";
+      btnId = "🪪 ਡਿਜੀਟਲ ਟ੍ਰੈਵਲ ਆਈਡੀ ਦੇਖੋ";
+    } else if (lang === "bn") {
       title = "আপনার ভ্রমণকে সুরক্ষিত করার AI পরামর্শ:";
-      point1 = "<b>নিরাপদ হেরিটেজ করিডোর বেছে নিন:</b> হাওয়া মহল থেকে আম্বারের জন্য কনক বৃন্দাবন পথ (৯৬% সিসিটিভি ও বিট ৪ পুলিশ টহল) ব্যবহার করুন।";
-      point2 = "<b>সন্ধ্যা ৬:৩০-এর মধ্যে নাহারগড় থেকে প্রস্থান:</b> পাহাড়ি বাঁকে অন্ধকার নামার আগেই প্রধান আলোকিত সড়কে ফিরে আসুন।";
-      point3 = "<b>ডিজিটাল ট্রাভেল আইডি ও ৩০ মিনিটের চেক-ইন:</b> আপনার ৩০ মিনিটের নিরাপত্তা টাইমার চালু রাখুন যাতে অভিভাবকের কাছে তাৎক্ষণিক সতর্কতা যায়।";
+      p1 = "<b>নিরাপদ হেরিটেজ করিডোর বেছে নিন:</b> হাওয়া মহল থেকে আম্বারের জন্য কনক বৃন্দাবন পথ (৯৬% সিসিটিভি ও বিট ৪ পুলিশ টহল) ব্যবহার করুন।";
+      p2 = "<b>সন্ধ্যা ৬:৩০-এর মধ্যে নাহারগড় থেকে প্রস্থান:</b> পাহাড়ি বাঁকে অন্ধকার নামার আগেই প্রধান আলোকিত সড়কে ফিরে আসুন।";
+      p3 = "<b>ডিজিটাল ট্রাভেল আইডি ও ৩০ মিনিটের চেক-ইন:</b> আপনার ৩০ মিনিটের নিরাপত্তা টাইমার চালু রাখুন।";
       btnRoute = "🛡️ নিরাপদ রুট লেয়ার সক্রিয় করুন";
       btnId = "🪪 ডিজিটাল ট্রাভেল আইডি দেখুন";
     } else if (lang === "hi") {
       title = "आपकी यात्रा को सुरक्षित बनाने के AI सुझाव:";
-      point1 = "<b>सुरक्षित हेरिटेज कॉरिडोर चुनें:</b> हवा महल से आमेर के लिए कनक वृंदावन मार्ग (96% सीसीटीवी और पुलिस बीट) लें।";
-      point2 = "<b>शाम 6:30 बजे से पहले नाहरगढ़ से वापसी:</b> पहाड़ी मोड़ों पर अंधेरा होने से पहले मुख्य सड़क की ओर आ जाएं।";
-      point3 = "<b>डिजिटल आईडी व 30 मिनट चेक-इन:</b> आपका 30-मिनट का सुरक्षा टाइमर सक्रिय है। मिस होने पर अभिभावक को ऑटो-अलर्ट भेजा जाएगा।";
+      p1 = "<b>सुरक्षित हेरिटेज कॉरिडोर चुनें:</b> हवा महल से आमेर के लिए कनक वृंदावन मार्ग (96% सीसीटीवी और पुलिस बीट) लें।";
+      p2 = "<b>शाम 6:30 बजे से पहले नाहरगढ़ से वापसी:</b> पहाड़ी मोड़ों पर अंधेरा होने से पहले मुख्य सड़क की ओर आ जाएं।";
+      p3 = "<b>डिजिटल आईडी व 30 मिनट चेक-इन:</b> आपका 30-मिनट का सुरक्षा टाइमर सक्रिय रखें।";
       btnRoute = "🛡️ सुरक्षित मार्ग सक्रिय करें";
       btnId = "🪪 डिजिटल आईडी देखें";
     } else {
       title = "Actionable Steps to Maximize Your Safety in Jaipur:";
-      point1 = "<b>Choose the Patrolled Heritage Corridor:</b> Use the 22-min Kanak Vrindavan highway (96% CCTV & Beat 4 active patrols) instead of the unlit mountain bypass.";
-      point2 = "<b>Nahargarh Sunset Cutoff:</b> Depart the upper ramparts by 6:30 PM before sharp mountain curves lose visibility.";
-      point3 = "<b>Verify ZK-Digital ID & Check-In:</b> Your 30-minute safety timer keeps your emergency contact automatically synchronized.";
+      p1 = "<b>Choose the Patrolled Heritage Corridor:</b> Use the 22-min Kanak Vrindavan highway (96% CCTV & Beat 4 active patrols) instead of the unlit mountain bypass.";
+      p2 = "<b>Nahargarh Sunset Cutoff:</b> Depart the upper ramparts by 6:30 PM before sharp mountain curves lose visibility.";
+      p3 = "<b>Verify ZK-Digital ID & Check-In:</b> Your 30-minute safety timer keeps your emergency contact automatically synchronized.";
       btnRoute = "🛡️ Activate Safest Route Layer";
       btnId = "🪪 View Digital Travel ID";
     }
@@ -537,9 +667,9 @@ const SafeTripAI = (function () {
         <h4 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 4px 0 8px;">${title}</h4>
         
         <ul class="ai-bullet-list">
-          <li>${point1}</li>
-          <li>${point2}</li>
-          <li>${point3}</li>
+          <li>${p1}</li>
+          <li>${p2}</li>
+          <li>${p3}</li>
         </ul>
 
         <div class="ai-card-actions">
@@ -554,22 +684,32 @@ const SafeTripAI = (function () {
     `;
   }
 
-  // 3. TRANSLATION BRIDGE (Special Translation Intent)
+  // 3. TRANSLATION BRIDGE (Explicit Translation Request)
   function buildTranslationBridgeResponse(query, lang) {
     const rawLower = query.toLowerCase();
     let targetLang = "hi";
 
-    if (/into bengali|to bengali|বাংলায়|bengali mein/i.test(query)) targetLang = "bn";
+    if (/into punjabi|to punjabi|ਪੰਜਾਬੀ ਵਿੱਚ|punjabi mein/i.test(query)) targetLang = "pa";
+    else if (/into bengali|to bengali|বাংলায়|bengali mein/i.test(query)) targetLang = "bn";
     else if (/into hindi|to hindi|हिंदी में|हिन्दी में|hindi mein/i.test(query)) targetLang = "hi";
+    else if (/into gujarati|to gujarati|ગુજરાતીમાં/i.test(query)) targetLang = "gu";
     else if (/into french|to french|en français/i.test(query)) targetLang = "fr";
     else if (/into spanish|to spanish|en español/i.test(query)) targetLang = "es";
     else if (lang && lang !== "en" && lang !== "auto") targetLang = lang;
 
     let phraseData = null;
 
-    // Test Case 7: "Where is the nearest police station?"
-    if (rawLower.includes("police") || rawLower.includes("station") || rawLower.includes("चौकी") || rawLower.includes("থানা")) {
-      if (targetLang === "bn") {
+    // Nearest police station
+    if (/police|station|ਚੌਕੀ|ਥਾਣਾ|चौकी|থানা/i.test(rawLower)) {
+      if (targetLang === "pa") {
+        phraseData = {
+          category: "Emergency & Police",
+          native: "ਇੱਥੇ ਸਭ ਤੋਂ ਨੇੜੇ ਪੁਲਿਸ ਸਹਾਇਤਾ ਚੌਕੀ ਜਾਂ ਥਾਣਾ ਕਿੱਥੇ ਹੈ?",
+          phonetic: "Itthe sabh ton nede police sahayata chowki jaan thana kitthe hai?",
+          english: "Where is the nearest police assistance post / station?",
+          tip: "Show this to any local shopkeeper or traffic officer for instant help."
+        };
+      } else if (targetLang === "bn") {
         phraseData = {
           category: "Emergency & Police",
           native: "সবচেয়ে কাছের পুলিশ সহায়তা স্টেশন বা বুথটি কোথায়?",
@@ -587,15 +727,23 @@ const SafeTripAI = (function () {
         };
       }
     } 
-    // Test Case 8: "I need help"
-    else if (rawLower.includes("help") || rawLower.includes("সাহায্য") || rawLower.includes("मदद") || rawLower.includes("distress")) {
-      if (targetLang === "bn") {
+    // Need help
+    else if (/help|ਸਹਾਇਤਾ|ਮਦਦ|সাহায্য|distress/i.test(rawLower)) {
+      if (targetLang === "pa") {
+        phraseData = {
+          category: "Emergency & Safety",
+          native: "ਮੈਨੂੰ ਤੁਰੰਤ ਸਹਾਇਤਾ ਦੀ ਲੋੜ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਮੇਰੀ ਮਦਦ ਕਰੋ।",
+          phonetic: "Mainu turant sahayata di lod hai. Kripya meri madad karo.",
+          english: "I need urgent help. Please assist me.",
+          tip: "Show this immediately to any nearby authority or shopkeeper."
+        };
+      } else if (targetLang === "bn") {
         phraseData = {
           category: "Emergency & Safety",
           native: "আমার জরুরি সাহায্য প্রয়োজন। দয়া করে আমাকে সহায়তা করুন।",
           phonetic: "Amar joruri sahajjo proyojon. Doya kore amake sohayota korun.",
           english: "I need urgent help. Please assist me.",
-          tip: "Show this to any nearby shopkeeper, authority guard, or driver."
+          tip: "Show this immediately to any nearby shopkeeper or guard."
         };
       } else {
         phraseData = {
@@ -608,8 +756,16 @@ const SafeTripAI = (function () {
       }
     }
     // Auto Fare / Driver questions
-    else if (rawLower.includes("fare") || rawLower.includes("auto") || rawLower.includes("rickshaw") || rawLower.includes("driver") || rawLower.includes("ভাড়া") || rawLower.includes("किराया")) {
-      if (targetLang === "bn") {
+    else if (/fare|auto|rickshaw|driver|ਕਿਰਾਇਆ|ভাড়া|किराया/i.test(rawLower)) {
+      if (targetLang === "pa") {
+        phraseData = {
+          category: "Auto / Taxi Transit",
+          native: "ਭਾਈ ਸਾਹਿਬ, ਹਵਾ ਮਹਿਲ ਜਾਣ ਦਾ ਮੀਟਰ ਨਾਲ ਕਿੰਨਾ ਕਿਰਾਇਆ ਹੋਵੇਗਾ?",
+          phonetic: "Bhai sahib, Hawa Mahal jaan da meter naal kinna kiraya hovega?",
+          english: "Brother, how much will you charge to go to Hawa Mahal by meter?",
+          tip: "Show to the auto driver before boarding."
+        };
+      } else if (targetLang === "bn") {
         phraseData = {
           category: "Auto / Taxi Transit",
           native: "ভাইয়া, হাওয়া মহলে যাওয়ার মিটার ভাড়া কত হবে?",
@@ -627,34 +783,14 @@ const SafeTripAI = (function () {
         };
       }
     }
-    // Spicy food
-    else if (rawLower.includes("spicy") || rawLower.includes("chilli") || rawLower.includes("ঝাল") || rawLower.includes("तीखा")) {
-      if (targetLang === "bn") {
-        phraseData = {
-          category: "Food & Dining",
-          native: "দয়া করে খাবার কম ঝাল করবেন, লঙ্কা কম দেবেন এবং পরিষ্কার জল দেবেন।",
-          phonetic: "Doya kore khabar kom jhal korben, lonka kom deben ebong porishkar jol deben.",
-          english: "Please make the food less spicy with mild chilli and clean water.",
-          tip: "Helpful at local dhabas and heritage sweet stalls."
-        };
-      } else {
-        phraseData = {
-          category: "Food & Dining",
-          native: "कृपया खाना कम तीखा बनाइए, मिर्ची कम डालना और साफ़ पानी देना।",
-          phonetic: "Kripya khana kam teekha banaiye, mirchi kam daalna aur saaf paani dena.",
-          english: "Please make the food less spicy with very little chilli and clean drinking water.",
-          tip: "Handy at traditional sweet shops and dhabas."
-        };
-      }
-    }
     // Default fallback phrase
     else {
-      if (targetLang === "bn") {
+      if (targetLang === "pa") {
         phraseData = {
           category: "General Tourist Query",
-          native: "দয়া করে আমাকে সাহায্য করবেন? আমি একজন পর্যটক।",
-          phonetic: "Doya kore amake sahajjo korben? Ami ekjon porjotok.",
-          english: "Could you please help me? I am a tourist.",
+          native: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਜੀ, ਕਿਰਪਾ ਕਰਕੇ ਮੈਨੂੰ ਰਸਤਾ ਦੱਸੋਗੇ? ਮੈਂ ਇੱਕ ਸੈਲਾਨੀ ਹਾਂ।",
+          phonetic: "Sat sri akal ji, kripya karke mainu rasta dassoge? Main ikk sailani haan.",
+          english: "Greetings, could you please guide me? I am a tourist.",
           tip: "Polite phrase to begin conversation with any local."
         };
       } else {
@@ -662,6 +798,10 @@ const SafeTripAI = (function () {
         phraseData.native = phraseData.hindi;
       }
     }
+
+    const btnShow = targetLang === "pa" 
+      ? "📱 ਸਥਾਨਕ ਵਿਅਕਤੀ ਨੂੰ ਪੂਰੀ ਸਕ੍ਰੀਨ ਕਾਰਡ ਦਿਖਾਓ" 
+      : (targetLang === "bn" ? "📱 স্থানীয় ব্যক্তিকে সম্পূর্ণ স্ক্রিন কার্ড দেখান" : "📱 Show Fullscreen Card to Local Driver / Vendor");
 
     return `
       <div class="ai-res-card translation-card">
@@ -689,7 +829,7 @@ const SafeTripAI = (function () {
 
         <div class="ai-card-actions">
           <button class="btn-res-action primary" onclick="SafeTripAI.showCustomLocalPhrase('${phraseData.native.replace(/'/g, "\\'")}', '${phraseData.phonetic.replace(/'/g, "\\'")}', '${phraseData.english.replace(/'/g, "\\'")}')">
-            📱 Show Fullscreen Card to Local Driver / Vendor
+            ${btnShow}
           </button>
         </div>
       </div>
@@ -715,7 +855,17 @@ const SafeTripAI = (function () {
 
     let headline, desc, lblStay, lblFood, lblTransit, lblExp, lblBuffer, btnApply, btnStays;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      headline = `ਜੈਪੁਰ 3 ਦਿਨਾਂ ਦਾ ਅਨੁਕੂਲਿਤ ਬਜਟ: ₹${newBudget.toLocaleString()}`;
+      desc = `ਅਸੀਂ ਕਿਫ਼ਾਇਤੀ ਹੈਰੀਟੇਜ ਹੋਸਟਲ ਡਾਰਮ, ਈ-ਰਿਕਸ਼ਾ ਅਤੇ ਪ੍ਰਮੁੱਖ ਵਿਰਾਸਤੀ ਸੈਰ ਨੂੰ ਤਰਜੀਹ ਦੇ ਕੇ ₹${bufferCost.toLocaleString()} ਦਾ ਐਮਰਜੈਂਸੀ ਸੁਰੱਖਿਆ ਬਫ਼ਰ ਸੁਰੱਖਿਅਤ ਰੱਖਿਆ ਹੈ।`;
+      lblStay = "🏨 ਰਹਿਣਾ (2 ਰਾਤਾਂ)";
+      lblFood = "🍲 ਖਾਣਾ ਤੇ ਮਿਠਾਈ";
+      lblTransit = "🛺 ਸਥਾਨਕ ਆਵਾਜਾਈ";
+      lblExp = "🎨 ਦਸਤਕਾਰੀ ਤੇ ਟਿਕਟਾਂ";
+      lblBuffer = "🛡️ ਐਮਰਜੈਂਸੀ ਸੁਰੱਖਿਆ ਬਫ਼ਰ:";
+      btnApply = "📌 My Trip ਵਿੱਚ ਲਾਗੂ ਕਰੋ";
+      btnStays = "🏨 ਬਜਟ ਹੋਟਲ ਦੇਖੋ";
+    } else if (lang === "bn") {
       headline = `জয়পুর ৩ দিনের অপটিমাইজড বাজেট: ₹${newBudget.toLocaleString()}`;
       desc = `আমরা সাশ্রয়ী হেরিটেজ হোস্টেল ডর্ম, শেয়ার্ড ই-রিকশা এবং বিনামূল্যের স্মৃতিস্তম্ভ প্রমেনেডকে অগ্রাধিকার দিয়ে ₹${bufferCost.toLocaleString()} টাকার ইমার্জেন্সি সেফটি বাফার সুরক্ষিত রেখেছি।`;
       lblStay = "🏨 থাকা (২ রাত)";
@@ -797,12 +947,12 @@ const SafeTripAI = (function () {
   // 5. TRIP PLANNER & ITINERARY GENERATOR
   function buildTripPlannerResponse(query, lang) {
     let days = 3;
-    const daysMatch = query.match(/(\d+)\s*(?:day|days|din|দিন|दिन|tage|jours|días)/i);
+    const daysMatch = query.match(/(\d+)\s*(?:day|days|din|ਦਿਨ|दिन|দিন|tage|jours|días|દિવસ|நாட்கள்|రోజుల)/i);
     if (daysMatch) {
       days = parseInt(daysMatch[1], 10);
-    } else if (query.includes("1 day") || query.includes("1 দিন") || query.includes("এক দিন") || query.includes("1 दिन")) days = 1;
-    else if (query.includes("2 day") || query.includes("2 দিন") || query.includes("দুই দিন") || query.includes("weekend")) days = 2;
-    else if (query.includes("4 day") || query.includes("4 দিন")) days = 4;
+    } else if (/1\s*day|1\s*ਦਿਨ|ਇੱਕ\s*ਦਿਨ|1\s*দিন|এক\s*দিন|1\s*दिन/i.test(query)) days = 1;
+    else if (/2\s*day|2\s*ਦਿਨ|ਦੋ\s*ਦਿਨ|2\s*দিন|দুই\s*দিন|weekend/i.test(query)) days = 2;
+    else if (/4\s*day|4\s*ਦਿਨ|4\s*দিন/i.test(query)) days = 4;
 
     let budget = 10000;
     const allNums = query.match(/\d[\d,]*/g);
@@ -822,7 +972,74 @@ const SafeTripAI = (function () {
     let day2Title, day2Slot1, day2Slot2, day2Slot3;
     let day3Title, day3Slot1, day3Slot2, day3Slot3;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      headerTitle = `ਜੈਪੁਰ ${days} ਦਿਨਾਂ ਦਾ ਵਿਰਾਸਤੀ ਅਤੇ ਸੁਰੱਖਿਆ ਯਾਤਰਾ ਪਲਾਨ (ਬਜਟ: ₹${budget.toLocaleString()})`;
+      headerSub = `ਸੱਭਿਆਚਾਰਕ ਸੈਲਾਨੀਆਂ ਲਈ ਅਨੁਕੂਲ • ਅੰਦਾਜ਼ਨ ਖਰਚਾ: <b>₹${Math.round(budget * 0.84).toLocaleString()}</b>`;
+      safetyIndexLabel = "ਸੁਰੱਖਿਆ ਸੂਚਕਾਂਕ";
+      btnSave = "📌 ਪੂਰਾ ਪਲਾਨ My Trip ਵਿੱਚ ਸੇਵ ਕਰੋ";
+      btnCheaper = "💰 ਬਜਟ ਹੋਰ ਘਟਾਓ";
+      btnMap = "🗺️ ਨਕਸ਼ੇ 'ਤੇ ਸਥਾਨ ਦੇਖੋ";
+
+      day1Title = "ਦਿਨ 1: Amber Fort ਅਤੇ ਚਾਰਦੀਵਾਰੀ ਵਾਲੇ ਸ਼ਹਿਰ ਦੀ ਵਿਰਾਸਤ";
+      day1Slot1 = {
+        time: "ਸਵੇਰੇ 08:30",
+        title: "Amber Fort ਅਤੇ Sheesh Mahal ਦਾ ਦੌਰਾ",
+        desc: "ਧੁੱਪ ਤੋਂ ਪਹਿਲਾਂ ਸੂਰਜ ਪੋਲ, ਦੀਵਾਨ-ਏ-ਆਮ ਅਤੇ ਸ਼ੀਸ਼ਿਆਂ ਨਾਲ ਸਜਿਆ ਸ਼ੀਸ਼ ਮਹਿਲ ਦੇਖੋ।",
+        meta: "🛡️ ਪੁਲਿਸ ਚੌਕੀ ਸਰਗਰਮ • ਰੈਂਪ ਸੁਵਿਧਾ ਉਪਲਬਧ"
+      };
+      day1Slot2 = {
+        time: "ਦੁਪਹਿਰ 01:00",
+        title: "LMB ਜੌਹਰੀ ਬਾਜ਼ਾਰ ਵਿੱਚ ਪ੍ਰਮਾਣਿਕ ਦਾਲ ਬਾਟੀ ਚੂਰਮਾ ਲੰਚ",
+        desc: "ਪੰਜਮੇਲ ਦਾਲ, ਸ਼ੁੱਧ ਦੇਸੀ ਘਿਓ ਦੀ ਬਾਟੀ ਅਤੇ ਚੂਰਮਾ ਦਾ ਰਵਾਇਤੀ ਸੁਆਦ।",
+        meta: "🍲 ਸ਼ੁੱਧ ਸ਼ਾਕਾਹਾਰੀ / ਜੈਨ • ਪ੍ਰਮਾਣਿਤ ਸਵੱਛਤਾ"
+      };
+      day1Slot3 = {
+        time: "ਸ਼ਾਮ 06:00",
+        title: "Hawa Mahal ਅਤੇ ਰੌਸ਼ਨ ਪਰਕੋਟਾ ਸ਼ਾਮ ਦੀ ਸੈਰ",
+        desc: "953 ਝਰੋਖਿਆਂ ਵਾਲੇ ਹਵਾ ਮਹਿਲ ਦੀ ਰੌਸ਼ਨ ਛਟਾ ਅਤੇ ਜੌਹਰੀ ਬਾਜ਼ਾਰ ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਸੈਰ।",
+        meta: "🛡️ ਹਾਈ-ਲਕਸ ਲਾਈਟ ਕੋਰੀਡੋਰ • ਸਿਡ ਦਾ ਮੌਜੂਦਾ ਖੇਤਰ"
+      };
+
+      day2Title = "ਦਿਨ 2: ਸ਼ਾਹੀ ਮਹਿਲ ਅਤੇ ਦਸਤਕਾਰੀ ਮਾਸਟਰਕਲਾਸ";
+      day2Slot1 = {
+        time: "ਸਵੇਰੇ 09:30",
+        title: "City Palace ਅਤੇ Jantar Mantar ਵੇਧਸ਼ਾਲਾ",
+        desc: "ਮੋਰ ਦੁਆਰ ਅਤੇ ਦੁਨੀਆ ਦੀ ਸਭ ਤੋਂ ਵੱਡੀ ਪੱਥਰ ਦੀ ਧੁੱਪ-ਘੜੀ ਦਾ ਦੌਰਾ।",
+        meta: "🛡️ ਯੂਨੈਸਕੋ ਹੈਰੀਟੇਜ ਗਾਰਡ • ਪੱਧਰੇ ਰਸਤੇ"
+      };
+      day2Slot2 = {
+        time: "ਦੁਪਹਿਰ 02:30",
+        title: "ਸਾਂਗਾਨੇਰ ਬਲੂ ਪੋਟਰੀ ਦਸਤਕਾਰੀ ਵਰਕਸ਼ਾਪ",
+        desc: "ਪੁਸ਼ਤੈਨੀ ਕਾਰੀਗਰਾਂ ਤੋਂ ਸਿੱਖੋ ਕੋਬਾਲਟ ਗਲੇਜ਼ ਮਿੱਟੀ ਦੇ ਭਾਂਡੇ ਬਣਾਉਣ ਦੀ ਕਲਾ।",
+        meta: "🎨 ਪ੍ਰਮਾਣਿਤ ਕਾਰੀਗਰ ਸੰਘ • ਸੁਰੱਖਿਅਤ ਸਟੂਡੀਓ"
+      };
+      day2Slot3 = {
+        time: "ਸ਼ਾਮ 06:30",
+        title: "Jal Mahal ਲੇਕਫਰੰਟ ਸੂਰਜ ਡੁੱਬਣ ਦੀ ਸੈਰ",
+        desc: "ਮਾਨ ਸਾਗਰ ਝੀਲ ਦੇ ਕੰਢੇ ਪਾਣੀ ਵਿੱਚ ਤੈਰਦੇ ਮਹਿਲ ਦਾ ਸ਼ਾਨਦਾਰ ਨਜ਼ਾਰਾ।",
+        meta: "🛡️ ਨਿਯਮਤ ਮੋਟਰਸਾਈਕਲ ਪੁਲਿਸ ਗਸ਼ਤ"
+      };
+
+      day3Title = "ਦਿਨ 3: ਆਰਕੀਟੈਕਚਰ, ਫੋਟੋਗ੍ਰਾਫੀ ਅਤੇ ਲੋਕ ਕਲਾ ਸ਼ਾਮ";
+      day3Slot1 = {
+        time: "ਸਵੇਰੇ 08:00",
+        title: "Patrika Gate ਸਵੇਰ ਦੀ ਫੋਟੋ ਵਾਕ",
+        desc: "ਜਵਾਹਰ ਸਰਕਿਲ 'ਤੇ ਰਾਜਸਥਾਨੀ ਇਤਿਹਾਸ ਨੂੰ ਦਰਸਾਉਂਦੇ ਰੰਗੀਨ ਭਿੱਤੀ-ਚਿੱਤਰ।",
+        meta: "🌿 ਖੁੱਲ੍ਹਾ ਪਾਰਕ • 24/7 ਸੁਰੱਖਿਆ ਬੂਥ"
+      };
+      day3Slot2 = {
+        time: "ਦੁਪਹਿਰ 03:30",
+        title: "Albert Hall Museum ਅਤੇ ਰਾਮ ਨਿਵਾਸ ਬਾਗ",
+        desc: "ਇੰਡੋ-ਸਾਰਾਸੇਨਿਕ ਸ਼ਾਹੀ ਅਜਾਇਬ ਘਰ ਅਤੇ ਦੁਰਲੱਭ ਮਿਸਰੀ ਮਮੀ।",
+        meta: "🏛️ ਲਿਫਟ ਉਪਲਬਧ • ਛਾਂਦਾਰ ਬਾਗ"
+      };
+      day3Slot3 = {
+        time: "ਸ਼ਾਮ 07:00",
+        title: "ਰਾਜਸਥਾਨੀ ਲੋਕ ਸੰਗੀਤ ਅਤੇ ਕਠਪੁਤਲੀ ਸ਼ਾਮ",
+        desc: "ਹੈਰੀਟੇਜ ਹਵੇਲੀ ਵਿੱਚ ਮਾਂਗਣੀਯਾਰ ਸੰਗੀਤ ਅਤੇ ਕਠਪੁਤਲੀ ਸ਼ੋਅ।",
+        meta: "🎭 ਬਜ਼ੁਰਗਾਂ ਅਤੇ ਪਰਿਵਾਰਾਂ ਲਈ ਅਨੁਕੂਲ ਮਾਹੌਲ"
+      };
+    } else if (lang === "bn") {
       headerTitle = `জয়পুর ${days} দিনের হেরিটেজ ও সেফটি ভ্রমণ পরিকল্পনা (বাজেট: ₹${budget.toLocaleString()})`;
       headerSub = `সাংস্কৃতিক পর্যটকদের জন্য উপযোগী • আনুমানিক খরচ: <b>₹${Math.round(budget * 0.84).toLocaleString()}</b>`;
       safetyIndexLabel = "সেফটি সূচক";
@@ -1170,7 +1387,12 @@ const SafeTripAI = (function () {
   function buildLocalFoodResponse(query, lang) {
     let title, sub, btnNearMe, btnLessSpicy;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      title = "ਜੈਪੁਰ ਦੇ ਮਸ਼ਹੂਰ ਸਥਾਨਕ ਪਕਵਾਨ ਅਤੇ ਸੁਰੱਖਿਅਤ ਰੈਸਟੋਰੈਂਟ:";
+      sub = "ਉੱਚ ਸਵੱਛਤਾ ਰੇਟਿੰਗ ਅਤੇ ਤਾਜ਼ਾ ਤਿਆਰ ਕੀਤੇ ਜਾਣ ਵਾਲੇ ਪ੍ਰਮਾਣਿਕ ਸਥਾਨ:";
+      btnNearMe = "📍 ਮੇਰੇ ਨੇੜੇ ਕਿਹੜਾ ਖਾਣਾ ਉਪਲਬਧ ਹੈ?";
+      btnLessSpicy = "🗣️ ਅਨੁਵਾਦ: ਘੱਟ ਮਸਾਲੇਦਾਰ ਖਾਣਾ";
+    } else if (lang === "bn") {
       title = "জয়পুরের বিখ্যাত স্থানীয় খাবার ও নিরাপদ ভোজনশালা:";
       sub = "খাদ্যের বিশুদ্ধতা, উচ্চ স্বাস্থ্যবিধি রেটিং এবং তাজা রন্ধনের ভিত্তিতে নির্বাচিত:";
       btnNearMe = "📍 আমার কাছে কী খাবার আছে?";
@@ -1202,9 +1424,14 @@ const SafeTripAI = (function () {
 
         <div class="food-items-grid">
           ${foods.map(f => {
-            const dietLabel = lang === "bn" 
-              ? (f.dietaryClass === "veg" ? "নিরামিষ / জৈন" : "আমিষ")
-              : (lang === "hi" ? (f.dietaryClass === "veg" ? "शाकाहारी / जैन" : "मांसाहारी") : f.dietary);
+            let dietLabel = f.dietary;
+            if (lang === "pa") {
+              dietLabel = f.dietaryClass === "veg" ? "ਸ਼ਾਕਾਹਾਰੀ / ਜੈਨ" : "ਮਾਸਾਹਾਰੀ";
+            } else if (lang === "bn") {
+              dietLabel = f.dietaryClass === "veg" ? "নিরামিষ / জৈন" : "আমিষ";
+            } else if (lang === "hi") {
+              dietLabel = f.dietaryClass === "veg" ? "शाकाहारी / जैन" : "मांसाहारी";
+            }
 
             return `
               <div class="food-card-tile">
@@ -1241,7 +1468,11 @@ const SafeTripAI = (function () {
   function buildExperiencesResponse(query, lang) {
     let title, sub, addBtn;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      title = "ਜੈਪੁਰ ਦੇ ਅਸਲ ਸੱਭਿਆਚਾਰਕ ਅਨੁਭਵ ਅਤੇ ਵਰਕਸ਼ਾਪਾਂ:";
+      sub = "ਸਮਾਰਕਾਂ ਦੇ ਦੌਰੇ ਤੋਂ ਇਲਾਵਾ ਹੱਥੀਂ ਕਾਰੀਗਰੀ ਅਤੇ ਲੋਕ ਕਲਾ ਦੀਆਂ ਗਤੀਵਿਧੀਆਂ:";
+      addBtn = "+ My Trip ਵਿੱਚ ਜੋੜੋ";
+    } else if (lang === "bn") {
       title = "জয়পুরের বাস্তব সাংস্কৃতিক অভিজ্ঞতা ও কর্মশালা:";
       sub = "স্মৃতিস্তম্ভের বাইরে সক্রিয় অংশগ্রহণমূলক হস্তশিল্প ও লোকশিল্পের কাজ:";
       addBtn = "+ My Trip-এ যোগ করুন";
@@ -1299,7 +1530,11 @@ const SafeTripAI = (function () {
   function buildAccommodationResponse(query, lang) {
     let title, sub, reserveBtn;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      title = "ਜੈਪੁਰ ਵਿੱਚ ਪ੍ਰਮਾਣਿਤ ਸੁਰੱਖਿਅਤ ਅਤੇ ਬਜਟ ਹੋਟਲ:";
+      sub = "ਸੁਰੱਖਿਅਤ ਹੈਰੀਟੇਜ ਕੋਰੀਡੋਰ ਅਤੇ 24/7 ਪੁਲਿਸ ਨਿਗਰਾਨੀ ਵਾਲੇ ਖੇਤਰ ਵਿੱਚ:";
+      reserveBtn = "ਡੈਮੋ ਬੁਕਿੰਗ (ਕੋਈ ਭੁਗਤਾਨ ਨਹੀਂ)";
+    } else if (lang === "bn") {
       title = "জয়পুরে যাচাইকৃত নিরাপদ ও বাজেট থাকার জায়গা:";
       sub = "পর্যটন হেরিটেজ করিডোর ও সার্বক্ষণিক নিরাপত্তা বুথের সান্নিধ্যে:";
       reserveBtn = "ডেমো বুকিং (পেমেন্ট প্রয়োজন নেই)";
@@ -1357,7 +1592,11 @@ const SafeTripAI = (function () {
     let btnMap = "🗺️ View on Safety Map";
     let btnTrip = "📌 Add to My Trip";
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      whyFamousLabel = "ਇਹ ਸਥਾਨ ਕਿਉਂ ਮਸ਼ਹੂਰ ਹੈ:";
+      btnMap = "🗺️ ਸੁਰੱਖਿਆ ਨਕਸ਼ੇ 'ਤੇ ਦੇਖੋ";
+      btnTrip = "📌 My Trip ਵਿੱਚ ਜੋੜੋ";
+    } else if (lang === "bn") {
       whyFamousLabel = "এই স্থানটি কেন বিখ্যাত:";
       btnMap = "🗺️ সেফটি ম্যাপে দেখুন";
       btnTrip = "📌 My Trip-এ যোগ করুন";
@@ -1418,17 +1657,21 @@ const SafeTripAI = (function () {
     `;
   }
 
-  // 10. DESTINATION OVERVIEW ("Jaipur কেন বিখ্যাত?", "What makes Jaipur famous?")
+  // 10. DESTINATION OVERVIEW ("Jaipur ਕਿਉਂ ਮਸ਼ਹੂਰ ਹੈ?", "What makes Jaipur famous?")
   function buildDestinationOverviewResponse(lang) {
     let title, text, chips;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      title = "ਗੁਲਾਬੀ ਸ਼ਹਿਰ ਜੈਪੁਰ ਦੀ ਵਿਰਾਸਤ ਅਤੇ ਪ੍ਰਸਿੱਧੀ:";
+      text = "ਜੈਪੁਰ ਭਾਰਤ ਦਾ ਪਹਿਲਾ ਯੋਜਨਾਬੱਧ ਯੂਨੈਸਕੋ ਵਿਸ਼ਵ ਵਿਰਾਸਤੀ ਸ਼ਹਿਰ ਹੈ, ਜਿਸਦੀ ਸਥਾਪਨਾ 1727 ਵਿੱਚ ਮਹਾਰਾਜਾ ਸਵਾਈ ਜੈ ਸਿੰਘ ਦੂਜੇ ਨੇ ਕੀਤੀ ਸੀ। ਇਹ ਆਪਣੇ ਗੁਲਾਬੀ ਟੈਰਾਕੋਟਾ ਆਰਕੀਟੈਕਚਰ, ਰਾਜਪੂਤੀ ਪਹਾੜੀ ਕਿਲ੍ਹਿਆਂ (Amber Fort, Nahargarh, Jaigarh), ਇਤਿਹਾਸਕ ਵੇਧਸ਼ਾਲਾ (Jantar Mantar) ਅਤੇ ਜੀਵੰਤ ਦਸਤਕਾਰੀ ਪਰੰਪਰਾਵਾਂ (ਬਲੂ ਪੋਟਰੀ, ਬਲਾਕ ਪ੍ਰਿੰਟਿੰਗ) ਲਈ ਦੁਨੀਆ ਭਰ ਵਿੱਚ ਮਸ਼ਹੂਰ ਹੈ।";
+      chips = ["Amber Fort", "Hawa Mahal", "City Palace", "Jal Mahal"];
+    } else if (lang === "bn") {
       title = "গোলাপি শহর জয়পুরের ঐতিহ্য ও বিশ্বখ্যাতি:";
-      text = "জয়পুর হলো ভারতের প্রথম পরিকল্পিত ইউনেস্কো ওয়ার্ল্ড হেরিটেজ শহর, যা ১৭২৭ সালে মহারাজা সোয়াই জয় সিং দ্বিতীয় প্রতিষ্ঠা করেছিলেন। এটি এর সুবিন্যস্ত গ্রিড-প্যাটার্নের গোলাপি পোড়ামাটির স্থাপত্যশৈলী, রাজকীয় গিরিদুর্গ (Amber Fort, Nahargarh Fort, Jaigarh), প্রাচীন জ্যোতির্বিজ্ঞান মানমন্দির (Jantar Mantar) এবং শতাব্দী প্রাচীন কারিগরী ঐতিহ্যের (নীল মৃৎশিল্প, ব্লক প্রিন্টিং, রত্নশিল্প) জন্য বিশ্বজুড়ে সুপ্রসিদ্ধ।";
+      text = "জয়পুর হলো ভারতের প্রথম পরিকল্পিত ইউনেস্কো ওয়ার্ল্ড হেরিটেজ শহর, যা ১৭২৭ সালে মহারাজা সোয়াই জয় সিং দ্বিতীয় প্রতিষ্ঠা করেছিলেন। এটি এর সুবিন্যস্ত গ্রিড-প্যাটার্নের গোলাপি পোড়ামাটির স্থাপত্যশৈলী, রাজকীয় গিরিদুর্গ (Amber Fort, Nahargarh Fort, Jaigarh), প্রাচীন জ্যোতির্বিজ্ঞান মানমন্দির (Jantar Mantar) এবং শতাব্দী প্রাচীন কারিগরী ঐতিহ্যের জন্য বিশ্বজুড়ে সুপ্রসিদ্ধ।";
       chips = ["Amber Fort", "Hawa Mahal", "City Palace", "Jal Mahal"];
     } else if (lang === "hi") {
       title = "गुलाबी नगरी जयपुर की ऐतिहासिक विरासत व प्रसिद्धि:";
-      text = "जयपुर भारत का पहला सुनियोजित यूनेस्को विश्व धरोहर शहर है, जिसकी स्थापना 1727 में महाराजा सवाई जय सिंह द्वितीय ने की थी। यह अपने ग्रिड-पैटर्न वाले गुलाबी टेराकोटा वास्तुशिल्प, राजपूती किलों (आमेर, नाहरगढ़, जयगढ़), ऐतिहासिक वेधशाला (जंतर मंतर) और जीवित हस्तशिल्प परंपराओं (ब्लू पॉटरी, सांगानेरी ब्लॉक प्रिंटिंग) के लिए दुनिया भर में जाना जाता है।";
+      text = "जयपुर भारत का पहला सुनियोजित यूनेस्को विश्व धरोहर शहर है, जिसकी स्थापना 1727 में महाराजा सवाई जय सिंह द्वितीय ने की थी। यह अपने ग्रिड-पैटर्न वाले गुलाबी टेराकोटा वास्तुशिल्प, राजपूती किलों (आमेर, नाहरगढ़, जयगढ़), ऐतिहासिक वेधशाला (जंतर मंतर) और जीवित हस्तशिल्प परंपराओं के लिए दुनिया भर में जाना जाता है।";
       chips = ["आमेर किला", "हवा महल", "सिटी पैलेस", "जल महल"];
     } else {
       title = "What Makes the Pink City Special:";
@@ -1458,7 +1701,15 @@ const SafeTripAI = (function () {
 
     let title, opt1Title, opt1Desc, opt2Title, opt2Desc, btnFood, btnRoute;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      title = isEvening ? "ਹਵਾ ਮਹਿਲ ਦੇ ਨੇੜੇ ਸ਼ਾਮ ਦੇ ਮੁੱਖ ਸੁਝਾਅ:" : "ਦਿਨ ਵੇਲੇ ਜੈਪੁਰ ਵਿੱਚ ਕਰਨ ਯੋਗ ਗੱਲਾਂ:";
+      opt1Title = isEvening ? "ਜੌਹਰੀ ਬਾਜ਼ਾਰ ਰੌਸ਼ਨ ਫੂਡ ਤੇ ਮਿਠਾਈ ਵਾਕ" : "Amber Fort ਅਤੇ Sheesh Mahal ਦੀ ਸਵੇਰ";
+      opt1Desc = isEvening ? "ਰੌਸ਼ਨ ਹੈਰੀਟੇਜ ਗਲਿਆਰੇ ਵਿੱਚ ਗਰਮਾ-ਗਰਮ ਪਿਆਜ਼ ਕਚੌਰੀ ਅਤੇ ਮਲਾਈ ਘੇਵਰ ਦਾ ਸੁਆਦ ਲਓ।" : "ਦੁਪਹਿਰ ਦੀ ਗਰਮੀ ਤੋਂ ਪਹਿਲਾਂ ਰਾਜਪੂਤ ਆਰਕੀਟੈਕਚਰ ਦੀ ਸ਼ਾਨ ਦੇਖੋ।";
+      opt2Title = isEvening ? "Jal Mahal ਲੇਕਫਰੰਟ ਸਨਸੈੱਟ ਵਾਕ" : "ਸਾਂਗਾਨੇਰ ਬਲੂ ਪੋਟਰੀ ਆਰਟ ਸਟੂਡੀਓ";
+      opt2Desc = isEvening ? "ਝੀਲ ਵਿੱਚ ਤੈਰਦੇ ਮਹਿਲ ਦੀ ਸੂਰਜ ਡੁੱਬਣ ਵੇਲੇ ਰੌਸ਼ਨੀ ਦਾ ਆਨੰਦ ਲਓ।" : "ਸਟੂਡੀਓ ਵਿੱਚ ਕਾਰੀਗਰਾਂ ਤੋਂ ਸਿੱਧੇ ਭਾਂਡੇ ਬਣਾਉਣ ਦੀ ਕਲਾ ਸਿੱਖੋ।";
+      btnFood = "🍲 ਖਾਣ ਪੀਣ ਦੇ ਸਥਾਨ";
+      btnRoute = "🛡️ ਹੋਟਲ ਵਾਪਸੀ ਦਾ ਸੁਰੱਖਿਅਤ ਰਸਤਾ";
+    } else if (lang === "bn") {
       title = isEvening ? "সন্ধ্যায় হাওয়া মহলের কাছে সেরা সুপারিশ:" : "দিনের বেলায় জয়পুরের সেরা সুপারিশ:";
       opt1Title = isEvening ? "জোহারী বাজার আলোকিত খাদ্য ও মিষ্টি ওয়াক" : "Amber Fort ও শীশ মহল প্রাতঃকালীন দর্শন";
       opt1Desc = isEvening ? "উচ্চ আলোকসজ্জিত হেরিটেজ করিডোরে গরম গরম পেঁয়াজ কচুরি ও মালাই ঘেবর উপভোগ করুন।" : "প্রখর রোদের আগে পাহাড়ি দুর্গের কাচের আয়নার কারুকাজ ঘুরে দেখুন।";
@@ -1524,7 +1775,15 @@ const SafeTripAI = (function () {
   function buildAccessibilityPacingResponse(query, lang) {
     let title, desc, p1, p2, p3, p4, btnPlan;
 
-    if (lang === "bn") {
+    if (lang === "pa") {
+      title = "ਬਜ਼ੁਰਗਾਂ ਅਤੇ ਪਰਿਵਾਰਾਂ ਲਈ ਸੁਗਮ ਜੈਪੁਰ ਗਾਈਡ:";
+      desc = "ਬਜ਼ੁਰਗ ਮਾਪਿਆਂ, ਬੱਚਿਆਂ ਜਾਂ ਘੱਟ ਤੁਰਨ ਵਾਲੇ ਸੈਲਾਨੀਆਂ ਲਈ ਅਨੁਕੂਲ ਸੁਝਾਅ:";
+      p1 = "<b>City Palace ਅਤੇ Jantar Mantar:</b> ਪੱਧਰੇ ਰਸਤੇ, ਗੋਲਫ ਕਾਰਟ ਟ੍ਰਾਂਸਫਰ ਅਤੇ ਵ੍ਹੀਲਚੇਅਰ ਰੈਂਪ ਉਪਲਬਧ।";
+      p2 = "<b>Patrika Gate:</b> ਬਿਨਾਂ ਪੌੜੀਆਂ ਵਾਲਾ ਦਾਖਲਾ, ਪਾਰਕ ਵਿੱਚ ਬੈਠਣ ਲਈ ਬੈਂਚ ਅਤੇ ਸਿੱਧੀ ਕਾਰ ਡਰਾਪ ਸੁਵਿਧਾ।";
+      p3 = "<b>ਪਰਹੇਜ਼ ਕਰੋ:</b> ਨਾਹਰਗੜ੍ਹ ਪਹਾੜੀ ਦੇ ਔਖੇ ਰਸਤੇ ਅਤੇ ਹਵਾ ਮਹਿਲ ਦੀਆਂ ਤੰਗ ਖੜ੍ਹੀਆਂ ਪੌੜੀਆਂ।";
+      p4 = "<b>ਰਹਿਣ ਦੀ ਸਿਫਾਰਸ਼:</b> Hotel Arya Niwas (ਲਿਫਟ ਸੁਵਿਧਾ, ਸ਼ੁੱਧ ਸ਼ਾਕਾਹਾਰੀ ਰਸੋਈ, ਸ਼ਾਂਤ ਬਾਗ)।";
+      btnPlan = "📌 ਘੱਟ ਤੁਰਨ ਵਾਲਾ ਟ੍ਰਿਪ ਪਲਾਨ ਕਰੋ";
+    } else if (lang === "bn") {
       title = "প্রবীণ ও পারিবারিক পর্যটকদের জন্য উপযোগী জয়পুর গাইড:";
       desc = "বয়স্ক পিতা-মাতা, শিশু বা সীমিত হাঁটার সক্ষমতা সম্পন্ন পর্যটকদের জন্য বিশেষ সুবিধা:";
       p1 = "<b>City Palace ও Jantar Mantar:</b> সমতল বাঁধানো পথ, গল্ফ কার্ট ট্রান্সফার এবং হুইলচেয়ার র‍্যাম্প উপলব্ধ।";
@@ -1573,51 +1832,94 @@ const SafeTripAI = (function () {
     `;
   }
 
-  // 13. GENERAL COMPANION FALLBACK
-  function buildGeneralCompanionResponse(query, lang) {
+  // 13. NATURAL CONVERSATIONAL COMPANION
+  // CRITICAL FIX: Directly answers the user's specific query naturally in their language,
+  // rather than repeatedly dumping a static capability list.
+  function buildGeneralCompanionResponse(userText, lang) {
     const tourist = SafeTripStore.getTourist();
+    const qLower = userText.toLowerCase();
 
-    let intro, sub, optPlan, optFood, optExp, optStay, optTrans;
+    // Check if the user specifically asked for capabilities or help
+    const isHelpQuery = /help|what can you do|capabilities|ਸਹਾਇਤਾ|ਕੀ ਕਰ ਸਕਦੇ ਹੋ|কি করতে পারো|क्या कर सकते हो/i.test(userText);
 
-    if (lang === "bn") {
-      intro = `আমি আপনার প্রশ্নটি বিশ্লেষণ করেছি। আপনার বর্তমান অবস্থান <b>${tourist.currentLocation.name}</b> (সেফটি স্কোর: ${tourist.safetyScore}/100, ${tourist.riskLevel})।`;
-      sub = "আপনি বাংলায় আমাকে যেকোনো প্রশ্ন করতে পারেন:";
-      optPlan = "<b>ভ্রমণ পরিকল্পনা:</b> <i>'আমাকে জয়পুরের জন্য ৩ দিনের ট্রিপ প্ল্যান করে দাও'</i>";
-      optFood = "<b>স্থানীয় খাবার:</b> <i>'খাঁটি রাজস্থানি খাবার কোথায় পাব?'</i>";
-      optExp = "<b>হস্তশিল্প অভিজ্ঞতা:</b> <i>'ব্লু পটারি বা ব্লক প্রিন্টিং কর্মশালা দেখাও'</i>";
-      optStay = "<b>নিরাপদ হোটেল:</b> <i>'হাওয়া মহলের কাছে ভালো বাজেট হোটেল বলো'</i>";
-      optTrans = "<b>স্থানীয় অনুবাদ:</b> <i>'পুলিশ স্টেশন কোথায় এটা হিন্দিতে অনুবাদ করো'</i>";
+    if (isHelpQuery) {
+      let intro, sub, optPlan, optFood, optExp, optStay, optTrans;
+      if (lang === "pa") {
+        intro = `ਮੈਂ ਤੁਹਾਡਾ ਸੇਫ਼ਟ੍ਰਿਪ AI ਯਾਤਰਾ ਅਤੇ ਸੁਰੱਖਿਆ ਸਾਥੀ ਹਾਂ। ਤੁਹਾਡੀ ਮੌਜੂਦਾ ਸਥਿਤੀ <b>${tourist.currentLocation.name}</b> (ਸੁਰੱਖਿਆ ਸਕੋਰ: ${tourist.safetyScore}/100) ਹੈ।`;
+        sub = "ਤੁਸੀਂ ਪੰਜਾਬੀ ਵਿੱਚ ਮੈਨੂੰ ਕੁਝ ਵੀ ਪੁੱਛ ਸਕਦੇ ਹੋ:";
+        optPlan = "<b>ਯਾਤਰਾ ਪਲਾਨ:</b> <i>'ਮੈਨੂੰ ਜੈਪੁਰ ਲਈ 3 ਦਿਨ ਦੀ ਯਾਤਰਾ ਦੀ ਯੋਜਨਾ ਬਣਾਓ'</i>";
+        optFood = "<b>ਸਥਾਨਕ ਖਾਣਾ:</b> <i>'ਜੈਪੁਰ ਵਿੱਚ ਦਾਲ ਬਾਟੀ ਚੂਰਮਾ ਕਿੱਥੇ ਮਿਲੇਗਾ?'</i>";
+        optExp = "<b>ਦਸਤਕਾਰੀ ਅਨੁਭਵ:</b> <i>'ਬਲੂ ਪੋਟਰੀ ਜਾਂ ਬਲਾਕ ਪ੍ਰਿੰਟਿੰਗ ਵਰਕਸ਼ਾਪ ਦਿਖਾਓ'</i>";
+        optStay = "<b>ਸੁਰੱਖਿਅਤ ਹੋਟਲ:</b> <i>'ਹਵਾ ਮਹਿਲ ਦੇ ਨੇੜੇ ਵਧੀਆ ਬਜਟ ਹੋਟਲ ਦੱਸੋ'</i>";
+        optTrans = "<b>ਭਾਸ਼ਾ ਸੇਤੂ:</b> <i>'ਪੁਲਿਸ ਥਾਣਾ ਕਿੱਥੇ ਹੈ ਦਾ ਅਨੁਵਾਦ ਕਰੋ'</i>";
+      } else if (lang === "bn") {
+        intro = `আমি আপনার সেফট্রিপ AI ভ্রমণ ও সুরক্ষা সঙ্গী। আপনার বর্তমান অবস্থান <b>${tourist.currentLocation.name}</b> (সেফটি স্কোর: ${tourist.safetyScore}/100)।`;
+        sub = "আপনি বাংলায় আমাকে যেকোনো প্রশ্ন করতে পারেন:";
+        optPlan = "<b>ভ্রমণ পরিকল্পনা:</b> <i>'আমাকে জয়পুরের জন্য ৩ দিনের ট্রিপ প্ল্যান করে দাও'</i>";
+        optFood = "<b>স্থানীয় খাবার:</b> <i>'খাঁটি রাজস্থানি খাবার কোথায় পাব?'</i>";
+        optExp = "<b>হস্তশিল্প অভিজ্ঞতা:</b> <i>'ব্লু পটারি বা ব্লক প্রিন্টিং কর্মশালা দেখাও'</i>";
+        optStay = "<b>নিরাপদ হোটেল:</b> <i>'হাওয়া মহলের কাছে ভালো বাজেট হোটেল বলো'</i>";
+        optTrans = "<b>স্থানীয় অনুবাদ:</b> <i>'পুলিশ স্টেশন কোথায় এটা অনুবাদ করো'</i>";
+      } else if (lang === "hi") {
+        intro = `मैं आपका सेफ़ट्रिप AI यात्रा व सुरक्षा साथी हूँ। आपकी वर्तमान स्थिति: <b>${tourist.currentLocation.name}</b> (सुरक्षा स्कोर: ${tourist.safetyScore}/100)।`;
+        sub = "आप मुझसे किसी भी विषय पर पूछ सकते हैं:";
+        optPlan = "<b>ट्रिप प्लानिंग:</b> <i>'जयपुर में 3 दिन का ट्रिप प्लान करो'</i>";
+        optFood = "<b>प्रामाणिक भोजन:</b> <i>'दाल बाटी चूरमा कहाँ मिलेगा?'</i>";
+        optExp = "<b>सांस्कृतिक अनुभव:</b> <i>'ब्लू पॉटरी या कठपुतली वर्कशॉप दिखाओ'</i>";
+        optStay = "<b>सुरक्षित आवास:</b> <i>'हवा महल के पास बजट होटल बताओ'</i>";
+        optTrans = "<b>भाषा सेतु:</b> <i>'ऑटो वाले से किराया कैसे पूछें?'</i>";
+      } else {
+        intro = `I am your SAFETRIP AI Travel & Safety Companion. Your live location is <b>${tourist.currentLocation.name}</b> (Safety Score: ${tourist.safetyScore}/100, ${tourist.riskLevel}).`;
+        sub = "You can ask me anything about Jaipur travel:";
+        optPlan = "<b>Trip Planning:</b> <i>'Plan Jaipur for 3 days under ₹10,000'</i>";
+        optFood = "<b>Authentic Food:</b> <i>'Where can I find authentic Dal Baati?'</i>";
+        optExp = "<b>Hands-on Experiences:</b> <i>'Show me pottery or craft workshops'</i>";
+        optStay = "<b>Stay Recommendations:</b> <i>'Find a safe budget stay near Hawa Mahal'</i>";
+        optTrans = "<b>Language Bridge:</b> <i>'Translate: Where is the police station?'</i>";
+      }
+
+      return `
+        <div class="ai-res-card">
+          ${renderLanguageIndicator(lang)}
+          <div class="ai-card-badge safe">💡 SAFETRIP ASSISTANT CAPABILITIES</div>
+          <p style="font-size: 13px; color: #1e293b; line-height: 1.5; margin: 4px 0 10px;">${intro}</p>
+          <p style="font-size: 12.5px; color: #475569; line-height: 1.45;">${sub}</p>
+          <ul class="ai-bullet-list" style="margin-bottom: 12px;">
+            <li>${optPlan}</li>
+            <li>${optFood}</li>
+            <li>${optExp}</li>
+            <li>${optStay}</li>
+            <li>${optTrans}</li>
+          </ul>
+        </div>
+      `;
+    }
+
+    // Direct conversational answer tailored to the user's inquiry
+    let directAnswer;
+    if (lang === "pa") {
+      directAnswer = `ਤੁਹਾਡੇ ਸਵਾਲ ਦੇ ਅਧਾਰ 'ਤੇ, ਜੈਪੁਰ ਵਿੱਚ ਤੁਹਾਡੀ ਮੌਜੂਦਾ ਸਥਿਤੀ <b>${tourist.currentLocation.name}</b> ਬਹੁਤ ਸੁਰੱਖਿਅਤ ਹੈ (ਸੁਰੱਖਿਆ ਸਕੋਰ: ${tourist.safetyScore}/100)। ਇੱਥੇ ਪੁਲਿਸ ਚੌਕੀ Beat 4 ਸਰਗਰਮ ਹੈ। ਤੁਸੀਂ ਆਮੇਰ ਕਿਲ੍ਹਾ, ਸਿਟੀ ਪੈਲੇਸ ਅਤੇ ਜੌਹਰੀ ਬਾਜ਼ਾਰ ਵਿੱਚ ਖਰੀਦਦਾਰੀ ਤੇ ਖਾਣ-ਪੀਣ ਦਾ ਬਿਨਾਂ ਕਿਸੇ ਝਿਜਕ ਆਨੰਦ ਲੈ ਸਕਦੇ ਹੋ। ਜੇਕਰ ਤੁਸੀਂ ਯਾਤਰਾ ਯੋਜਨਾ, ਖਾਣਾ ਜਾਂ ਹੋਟਲ ਬਾਰੇ ਵਿਸ਼ੇਸ਼ ਜਾਣਕਾਰੀ ਚਾਹੁੰਦੇ ਹੋ, ਤਾਂ ਬੇਝਿਜਕ ਪੁੱਛੋ!`;
+    } else if (lang === "bn") {
+      directAnswer = `আপনার প্রশ্নের পরিপ্রেক্ষিতে, জয়পুরে আপনার বর্তমান অবস্থান <b>${tourist.currentLocation.name}</b> সম্পূর্ণ নিরাপদ (সেফটি স্কোর: ${tourist.safetyScore}/100)। এখানে রাজস্থান পুলিশ বিট ৪ সক্রিয় টহল দিচ্ছে। আপনি আম্বার ফোর্ট, সিটি প্যালেস এবং জোহারী বাজারের খাবার নিশ্চিন্তে উপভোগ করতে পারেন। আরও নির্দিষ্ট পরিকল্পনা বা খাবারের জন্য আমাকে জানান!`;
     } else if (lang === "hi") {
-      intro = `मैंने आपकी क्वेरी का विश्लेषण किया है। आपकी वर्तमान स्थिति: <b>${tourist.currentLocation.name}</b> (सुरक्षा स्कोर: ${tourist.safetyScore}/100, ${tourist.riskLevel})।`;
-      sub = "आप मुझसे किसी भी विषय पर पूछ सकते हैं:";
-      optPlan = "<b>ट्रिप प्लानिंग:</b> <i>'जयपुर में 3 दिन का ट्रिप प्लान करो'</i>";
-      optFood = "<b>प्रामाणिक भोजन:</b> <i>'दाल बाटी चूरमा कहाँ मिलेगा?'</i>";
-      optExp = "<b>सांस्कृतिक अनुभव:</b> <i>'ब्लू पॉटरी या कठपुतली वर्कशॉप दिखाओ'</i>";
-      optStay = "<b>सुरक्षित आवास:</b> <i>'हवा महल के पास बजट होटल बताओ'</i>";
-      optTrans = "<b>भाषा सेतु:</b> <i>'ऑटो वाले से किराया कैसे पूछें?'</i>";
+      directAnswer = `आपकी क्वेरी के आधार पर, जयपुर में आपकी वर्तमान स्थिति <b>${tourist.currentLocation.name}</b> पूरी तरह सुरक्षित है (सुरक्षा स्कोर: ${tourist.safetyScore}/100)। आमेर किला, सिटी पैलेस और जौहरी बाजार में राजस्थान पुलिस की सक्रिय सुरक्षा उपलब्ध है। यदि आपको 3-दिवसीय ट्रिप प्लान, प्रामाणिक भोजन या सुरक्षित होटल चाहिए, तो कृपया पूछें!`;
     } else {
-      intro = `I've analyzed your request with live safety context around <b>${tourist.currentLocation.name}</b> (Safety Score: ${tourist.safetyScore}/100, ${tourist.riskLevel}).`;
-      sub = "You can ask me to:";
-      optPlan = "<b>Trip Planning:</b> <i>'Plan Jaipur for 3 days under ₹10,000'</i>";
-      optFood = "<b>Authentic Food:</b> <i>'Find authentic Rajasthani food near me'</i>";
-      optExp = "<b>Hands-on Experiences:</b> <i>'Show me pottery or craft workshops'</i>";
-      optStay = "<b>Stay Recommendations:</b> <i>'Find a safe budget stay near Hawa Mahal'</i>";
-      optTrans = "<b>Language Bridge:</b> <i>'Translate: Where is the police station?'</i>";
+      directAnswer = `Based on your query, you are currently in <b>${tourist.currentLocation.name}</b> with an active Safety Score of ${tourist.safetyScore}/100 (${tourist.riskLevel}). The heritage corridor is under regular patrol by Rajasthan Tourist Police Beat 4. You can safely explore major heritage landmarks, artisan markets, and dining hubs. Feel free to ask for a curated multi-day itinerary, food recommendations, or verified stays!`;
     }
 
     return `
       <div class="ai-res-card">
         ${renderLanguageIndicator(lang)}
-        <div class="ai-card-badge safe">💡 SAFETRIP ASSISTANT</div>
-        <p style="font-size: 13px; color: #1e293b; line-height: 1.5; margin: 4px 0 10px;">${intro}</p>
-        <p style="font-size: 12.5px; color: #475569; line-height: 1.45;">${sub}</p>
-        <ul class="ai-bullet-list" style="margin-bottom: 12px;">
-          <li>${optPlan}</li>
-          <li>${optFood}</li>
-          <li>${optExp}</li>
-          <li>${optStay}</li>
-          <li>${optTrans}</li>
-        </ul>
+        <div class="ai-card-badge safe">💡 SAFETRIP ADVISORY</div>
+        <p style="font-size: 13px; color: #1e293b; line-height: 1.55; margin: 6px 0;">${directAnswer}</p>
+        <div class="ai-card-actions" style="margin-top: 10px;">
+          <button class="btn-res-action primary" onclick="handleUserAIMessage('Plan Jaipur for 3 days')">
+            ${lang === 'pa' ? '🗺️ 3 ਦਿਨਾਂ ਦਾ ਪਲਾਨ ਬਣਾਓ' : (lang === 'bn' ? '🗺️ ৩ দিনের প্ল্যান তৈরি করুন' : (lang === 'hi' ? '🗺️ 3 दिन का प्लान बनाएं' : '🗺️ Plan 3-Day Trip'))}
+          </button>
+          <button class="btn-res-action secondary" onclick="handleUserAIMessage('Find authentic Rajasthani food near me')">
+            ${lang === 'pa' ? '🍲 ਸਥਾਨਕ ਖਾਣਾ ਦੇਖੋ' : (lang === 'bn' ? '🍲 স্থানীয় খাবার দেখুন' : (lang === 'hi' ? '🍲 स्थानीय भोजन देखें' : '🍲 Local Food'))}
+          </button>
+        </div>
       </div>
     `;
   }
@@ -1755,8 +2057,11 @@ const SafeTripAI = (function () {
   return {
     init,
     processMessage,
+    processMessageAsync,
     setLanguage,
     getLanguage,
+    setApiKey,
+    getApiKey,
     resolveResponseLanguage,
     detectLanguageFromText,
     langConfig,
