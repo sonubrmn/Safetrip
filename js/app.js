@@ -359,8 +359,54 @@ function initSafetyAIAssistant() {
       if (text) {
         handleUserAIMessage(text);
         input.value = "";
+        startPlaceholderRotation();
       }
     });
+
+    // Multilingual Placeholder Cycling (4.2s calm moderate rotation)
+    const placeholderExamples = [
+      "Plan Jaipur for 3 days under ₹10,000",
+      "₹10,000 में 3 दिन का जयपुर ट्रिप प्लान करो",
+      "₹১০,০০০-এর মধ্যে ৩ দিনের জয়পুর ট্রিপ প্ল্যান করো",
+      "₹10,000 ਦੇ ਅੰਦਰ ਜੈਪੁਰ ਲਈ 3 ਦਿਨਾਂ ਦੀ ਟ੍ਰਿਪ ਪਲਾਨ ਕਰੋ",
+      "Planifica un viaje de 3 días a Jaipur por menos de ₹10.000",
+      "Planifie un voyage de 3 jours à Jaipur pour moins de ₹10 000",
+      "Plane eine 3-tägige Jaipur-Reise für unter ₹10.000",
+      "₹10,000க்குள் ஜெய்ப்பூருக்கு 3 நாள் பயணத்தைத் திட்டமிடு",
+      "₹10,000లోపు జైపూర్ 3 రోజుల ట్రిప్ ప్లాన్ చేయండి",
+      "₹10,000માં જયપુરની 3 દિવસની ટ્રિપ પ્લાન કરો",
+      "₹10,000 کے اندر جے پور کے لیے 3 دن کا سفر پلان کریں"
+    ];
+    let phIdx = 0;
+    let phTimer = null;
+
+    function startPlaceholderRotation() {
+      if (phTimer) clearInterval(phTimer);
+      phTimer = setInterval(() => {
+        if (!input.value.trim()) {
+          phIdx = (phIdx + 1) % placeholderExamples.length;
+          input.setAttribute("placeholder", placeholderExamples[phIdx]);
+        }
+      }, 4200);
+    }
+
+    function stopPlaceholderRotation() {
+      if (phTimer) {
+        clearInterval(phTimer);
+        phTimer = null;
+      }
+    }
+
+    input.addEventListener("focus", () => stopPlaceholderRotation());
+    input.addEventListener("input", () => {
+      if (input.value.length > 0) stopPlaceholderRotation();
+      else startPlaceholderRotation();
+    });
+    input.addEventListener("blur", () => {
+      if (!input.value.trim()) startPlaceholderRotation();
+    });
+
+    startPlaceholderRotation();
   }
 
   // Suggestion chips
