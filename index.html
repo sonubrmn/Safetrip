@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAFETRIP — Smart Tourist Safety Monitoring & Incident Response</title>
+  <meta name="description" content="AI-powered tourist safety intelligence, geofencing, blockchain digital identity, and proactive emergency incident response.">
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet.js CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- SAFETRIP Design System Styles -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ========================================================================
+       TOP NAVIGATION BAR
+       ======================================================================== -->
+  <header class="site-header">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand-group" aria-label="SAFETRIP Homepage">
+        <div class="brand-icon">ST</div>
+        <div class="brand-text">
+          <span class="brand-name">SAFETRIP</span>
+          <span class="brand-tagline">Travel freely. Stay protected.</span>
+        </div>
+      </a>
+
+      <nav aria-label="Primary Navigation">
+        <ul class="nav-links">
+          <li><a href="#explore" class="nav-link active">Explore</a></li>
+          <li><a href="#safety-map" class="nav-link">Safety Map</a></li>
+          <li><a href="#routes" class="nav-link">Safe Routes</a></li>
+          <li><a href="#companion" class="nav-link">My Trip</a></li>
+          <li>
+            <a href="authority.html" class="authority-switch-badge" title="Access Police & Municipal Authority Command Center">
+              <span>🛡️</span> Authority Center &rarr;
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="header-actions">
+        <button class="btn-sos btn-trigger-sos" id="headerSosBtn" aria-label="Trigger Emergency SOS">
+          <span class="pulse-dot"></span>
+          <span>Emergency SOS</span>
+        </button>
+
+        <button class="btn-profile" id="headerProfileBtn" onclick="openDigitalIdModalView('view')" aria-label="Open Digital Identity Profile">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Tourist Avatar">
+          <span>Sid</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ========================================================================
+         HERO SECTION: SEARCH & SAFETY AI
+         ======================================================================== -->
+    <section class="hero-section" id="hero">
+      <div class="container hero-content">
+        <div class="hero-pill">
+          <span class="status-indicator"></span>
+          <span>AI Safety Sentinel Active • DEMO PROTOTYPE SIMULATION</span>
+        </div>
+
+        <h1 class="hero-title">
+          Travel freely.<br>We'll watch your back.
+        </h1>
+
+        <p class="hero-subtitle">
+          AI-powered safety intelligence, smart geo-fencing, and decentralized identity for every journey.
+        </p>
+
+        <!-- Large Search Box -->
+        <div class="search-container" role="search">
+          <div class="search-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </div>
+          <input 
+            type="text" 
+            id="destinationSearchInput" 
+            class="search-input" 
+            placeholder="Where are you headed? (e.g. Amber Fort, Hawa Mahal, Jal Mahal)"
+            aria-label="Destination Search Query"
+          >
+          <button class="btn-ask-ai" id="btnAskAiSearch">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+            Ask Safety AI
+          </button>
+        </div>
+
+        <!-- Quick Suggestions -->
+        <div class="search-suggestions" aria-label="Safety Query Quick Suggestions">
+          <button class="suggestion-chip" data-query="Is Jaipur safe tonight?">"Is Jaipur safe tonight?"</button>
+          <button class="suggestion-chip" data-query="Find the safest route">"Find the safest route"</button>
+          <button class="suggestion-chip" data-query="Nearest hospital">"Nearest hospital"</button>
+          <button class="suggestion-chip" data-query="Safety around me">"Safety around me"</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         PERSONAL SAFETY STATUS
+         ======================================================================== -->
+    <section class="safety-status-section" id="status" aria-label="Personal Safety Status">
+      <div class="container">
+        <div class="status-card state-safe" id="personalStatusCard">
+          
+          <div class="location-info">
+            <div class="status-label">Your Live Location</div>
+            <div class="location-val">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: #0284c7;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+              <span id="statusLocationText">Hawa Mahal Precinct, Jaipur</span>
+            </div>
+            <div class="location-sub">Rajasthan Tourist Protection Zone #04</div>
+          </div>
+
+          <div>
+            <div class="status-label">Current Risk Level</div>
+            <div class="risk-badge-group">
+              <span class="risk-pill safe" id="statusRiskPill">LOW RISK</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="status-label">AI Safety Score</div>
+            <div class="score-display">
+              <span class="score-number" id="statusScoreNum">84</span>
+              <span class="score-denom">/ 100</span>
+            </div>
+          </div>
+
+          <div class="status-indicators">
+            <div class="indicator-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Safe zone active</span>
+            </div>
+            <div class="indicator-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Police post < 200m</span>
+            </div>
+            <div class="indicator-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Live telemetry connected</span>
+            </div>
+          </div>
+
+          <div>
+            <a href="#safety-map" class="btn-open-map">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+              Open Safety Map
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         SAFETY MAP WITH GEOFENCES & INTERACTIVE SIMULATION
+         ======================================================================== -->
+    <section class="map-section" id="safety-map">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Interactive Safety Map</h2>
+            <p class="section-desc">Live geofences, monitored tourist corridors, police posts, and verified hospital locations.</p>
+          </div>
+
+          <!-- Simulation Triggers for Hackathon Demo -->
+          <div class="map-sim-controls">
+            <button class="btn-sim-walk danger-sim" onclick="simulateRestrictedWalk()" title="Demonstrate entering a high risk restricted zone">
+              <span>⚠️</span> Simulate Entering Restricted Zone
+            </button>
+            <button class="btn-sim-walk" onclick="simulateSafeWalk()" title="Return tourist marker to verified safe heritage zone">
+              <span>✓</span> Return to Safe Corridor
+            </button>
+          </div>
+        </div>
+
+        <div class="map-wrapper">
+          <!-- Toolbar & Map Legend -->
+          <div class="map-toolbar">
+            <div class="map-legend">
+              <div class="legend-item">
+                <span class="legend-dot safe"></span>
+                <span>Safe Zone</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot caution"></span>
+                <span>Caution Zone</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot restricted"></span>
+                <span>Restricted / Hazard</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot emergency"></span>
+                <span>Emergency POI (Hospital / Police)</span>
+              </div>
+            </div>
+
+            <div style="font-size: 12px; color: #64748b;">
+              💡 <em>Tip: You can drag the tourist pin anywhere on the map to test real-time geofence detection.</em>
+            </div>
+          </div>
+
+          <!-- Leaflet Canvas -->
+          <div id="safetyMap" aria-label="Interactive Map of Jaipur Tourist Zones"></div>
+
+          <!-- Non-intrusive Warning Banner -->
+          <div class="map-alert-banner" id="mapAlertBanner" style="display: none;" role="alert">
+            <div class="alert-message-group">
+              <div class="alert-icon-box">⚠️</div>
+              <div>
+                <div class="alert-title">You've entered a restricted area.</div>
+                <div class="alert-desc">Steep drop-off and unmonitored mountain terrain. Risk elevated to HIGH.</div>
+              </div>
+            </div>
+            <div class="alert-actions">
+              <a href="#routes" class="btn-safer-route" onclick="hideMapAlert()">View safer route</a>
+              <button class="btn-dismiss-alert" onclick="hideMapAlert()" aria-label="Dismiss Alert">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         SAFETY INSIGHTS: DESTINATION CARDS
+         ======================================================================== -->
+    <section class="destinations-section" id="explore">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Safety Insights by Destination</h2>
+            <p class="section-desc">Curated heritage landmarks with proactive risk ratings, patrol density, and verified safe visiting hours.</p>
+          </div>
+        </div>
+
+        <div class="cards-grid" id="destinationCardsGrid">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         SAFEST ROUTE: "Choose the safer way"
+         ======================================================================== -->
+    <section class="route-section" id="routes">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Choose the safer way.</h2>
+            <p class="section-desc">Our AI routing engine evaluates illumination, patrol frequency, and crowd safety telemetry—not just distance.</p>
+          </div>
+        </div>
+
+        <div class="route-grid">
+          <!-- Fastest Route Card -->
+          <div class="route-card" id="routeCardFastest">
+            <span class="route-badge" style="background: #e2e8f0; color: #475569;">Alternative</span>
+            <h3 class="route-type-title">Fastest Route</h3>
+            <div class="route-time-stat">
+              18 <span>min</span>
+            </div>
+
+            <div class="route-metrics-list">
+              <div class="metric-row">
+                <span class="metric-label">Safety Score</span>
+                <span class="metric-val" style="color: #d97706;">68 / 100 (Caution)</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">CCTV & Street Lighting</span>
+                <span class="metric-val">42% Coverage</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Police Patrol Frequency</span>
+                <span class="metric-val">Every 4 hours</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Terrain Risk</span>
+                <span class="metric-val">Unlit mountain bypass</span>
+              </div>
+            </div>
+
+            <button class="btn-select-route" id="btnSelectFastestRoute">
+              Switch to Fastest
+            </button>
+          </div>
+
+          <!-- Safest Route Card (Recommended) -->
+          <div class="route-card is-recommended" id="routeCardSafest">
+            <span class="route-badge">AI Recommended</span>
+            <h3 class="route-type-title">Safest Route</h3>
+            <div class="route-time-stat">
+              22 <span>min</span>
+            </div>
+
+            <div class="route-metrics-list">
+              <div class="metric-row">
+                <span class="metric-label">Safety Score</span>
+                <span class="metric-val" style="color: #059669;">94 / 100 (Exceptional)</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">CCTV & Street Lighting</span>
+                <span class="metric-val">96% High-Lux Corridor</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Police Patrol Frequency</span>
+                <span class="metric-val">Every 15 mins (Beat 4)</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Emergency SOS Call Boxes</span>
+                <span class="metric-val">4 Active Pillars along path</span>
+              </div>
+            </div>
+
+            <button class="btn-select-route" id="btnSelectSafestRoute">
+              Current Active Route
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         SAFETY CHECK-IN & DIGITAL TOURIST ID
+         ======================================================================== -->
+    <section class="companion-tools-section" id="companion">
+      <div class="container">
+        <div class="two-col-grid">
+          
+          <!-- Safety Check-In Widget -->
+          <div class="checkin-card">
+            <div>
+              <div class="checkin-head">
+                <div>
+                  <h3 class="checkin-title">Stay Connected</h3>
+                  <p class="checkin-desc">Proactive check-ins automatically alert loved ones & responders if you miss your scheduled window.</p>
+                </div>
+                <span style="font-size: 24px;">⏱️</span>
+              </div>
+
+              <div class="timer-box">
+                <div>
+                  <div class="timer-label">Next Check-In Due</div>
+                  <div class="timer-digits" id="checkInTimerDisplay">18:24</div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">Cadence</div>
+                  <div style="font-size: 14px; font-weight: 700; color: #0f172a;">Every 30 mins</div>
+                </div>
+              </div>
+
+              <!-- Missed check-in warning container (simulated via button) -->
+              <div class="missed-alert-box" id="missedCheckInAlert">
+                <div class="missed-alert-title">
+                  <span>⚠️</span> Safety check-in missed
+                </div>
+                <div class="missed-alert-sub">
+                  Last known location: <b>Amber Fort Outer Trails</b> • AI Risk: <b>MEDIUM</b>
+                </div>
+                <div class="missed-actions">
+                  <button class="btn-contact-tourist" onclick="alert('Demo telemetry check: Pinging tourist device...')">
+                    Contact Tourist
+                  </button>
+                  <button class="btn-notify-contact" onclick="alert('Demo notification dispatched to Emergency Contact: Guardian (+91 98765 12345)')">
+                    Notify Emergency Contact
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="checkin-actions-row">
+              <button class="btn-checkin-now" id="btnCheckInNow">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                I am Safe • Check In Now
+              </button>
+              <button class="btn-sim-missed" id="btnSimulateMissedCheckIn" title="Simulate missed check-in to demonstrate proactive response">
+                Simulate Missed
+              </button>
+            </div>
+          </div>
+
+          <!-- Digital Tourist Travel ID -->
+          <div class="digital-id-card">
+            <div>
+              <div class="id-header">
+                <div>
+                  <div class="id-brand-chip">SAFETRIP PASS</div>
+                  <div style="font-size: 14px; font-weight: 700; color: #ffffff;">DIGITAL TRAVEL ID</div>
+                </div>
+                <div class="id-badge">
+                  <span>🔒</span> Blockchain Verified
+                </div>
+              </div>
+
+              <div class="id-body">
+                <div>
+                  <div class="id-tourist-name">Sid</div>
+                  <div class="id-number">ID: ST-8F42A1</div>
+                  <div class="id-status-text">
+                    <span style="color: #34d399;">✓</span> Identity Verified • Nationality: IND
+                  </div>
+                  <div style="font-size: 12px; color: #94a3b8; margin-top: 4px;">
+                    Emergency Contact: <b>Connected</b>
+                  </div>
+                </div>
+
+                <div class="id-qr-box" aria-label="Digital ID QR Code">
+                  <svg viewBox="0 0 100 100">
+                    <rect x="0" y="0" width="30" height="30" fill="#0f172a"/>
+                    <rect x="5" y="5" width="20" height="20" fill="#ffffff"/>
+                    <rect x="9" y="9" width="12" height="12" fill="#0f172a"/>
+                    <rect x="70" y="0" width="30" height="30" fill="#0f172a"/>
+                    <rect x="75" y="5" width="20" height="20" fill="#ffffff"/>
+                    <rect x="79" y="9" width="12" height="12" fill="#0f172a"/>
+                    <rect x="0" y="70" width="30" height="30" fill="#0f172a"/>
+                    <rect x="5" y="75" width="20" height="20" fill="#ffffff"/>
+                    <rect x="9" y="79" width="12" height="12" fill="#0f172a"/>
+                    <rect x="36" y="8" width="10" height="10" fill="#0f172a"/>
+                    <rect x="42" y="24" width="12" height="12" fill="#0f172a"/>
+                    <rect x="22" y="40" width="14" height="14" fill="#0f172a"/>
+                    <rect x="48" y="44" width="14" height="14" fill="#0f172a"/>
+                    <rect x="68" y="40" width="16" height="16" fill="#0f172a"/>
+                    <rect x="38" y="68" width="14" height="14" fill="#0f172a"/>
+                    <rect x="66" y="72" width="20" height="14" fill="#0f172a"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="id-actions">
+              <button class="btn-show-id" id="btnShowDigitalId">Show ID Pass</button>
+              <button class="btn-verify-id" id="btnVerifyDigitalId">Verify On-Chain</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         EMERGENCY & OFFLINE SAFETY SECTION
+         ======================================================================== -->
+    <section class="emergency-offline-section">
+      <div class="container">
+        <div class="offline-safety-card">
+          <div class="offline-info-group">
+            <div class="offline-icon-circle">📡</div>
+            <div>
+              <div class="offline-title">Offline Safety Shield Active</div>
+              <div class="offline-sync-stamp">Last synced: 2 minutes ago • Cached locally on device</div>
+            </div>
+          </div>
+
+          <div class="offline-checklist">
+            <div class="check-pill">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Digital ID</span>
+            </div>
+            <div class="check-pill">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Emergency Contacts</span>
+            </div>
+            <div class="check-pill">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Last Known Safety Info</span>
+            </div>
+            <div class="check-pill">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Emergency Instructions</span>
+            </div>
+          </div>
+
+          <div>
+            <button class="btn-sos btn-trigger-sos" style="padding: 10px 20px;">
+              🚨 Press for SOS
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ========================================================================
+       FLOATING SAFETY AI ASSISTANT
+       ======================================================================== -->
+  <button class="ai-fab" id="aiFabBtn" aria-label="Open Safety AI Assistant">
+    <span class="ai-fab-indicator"></span>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+    <span>Safety AI</span>
+  </button>
+
+  <!-- Slide-up AI Assistant Panel -->
+  <aside class="ai-panel" id="aiPanel" aria-label="Safety AI Chat Panel">
+    <div class="ai-header">
+      <div>
+        <div class="ai-header-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #0284c7;"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+          Safety AI
+        </div>
+        <div class="ai-header-sub">Ask about your surroundings, route or emergency options.</div>
+      </div>
+      <button class="btn-close-panel" id="btnCloseAiPanel" aria-label="Close Safety AI Panel">✕</button>
+    </div>
+
+    <div class="ai-chat-body" id="aiChatBody">
+      <div class="chat-bubble assistant">
+        Namaste Sid! I am your SAFETRIP AI Companion. You are currently in the <b>Hawa Mahal Heritage Precinct</b> (Safety Score: 84, Low Risk). How can I assist your journey?
+      </div>
+    </div>
+
+    <div class="ai-suggestions-row">
+      <button class="ai-chip">Is this area safe?</button>
+      <button class="ai-chip">Find a safer route</button>
+      <button class="ai-chip">Nearest hospital</button>
+      <button class="ai-chip">I feel unsafe</button>
+      <button class="ai-chip">Emergency numbers</button>
+    </div>
+
+    <form class="ai-input-form" id="aiInputForm">
+      <input type="text" class="ai-text-input" id="aiTextInput" placeholder="Ask Safety AI anything..." aria-label="Ask Safety AI">
+      <button type="submit" class="btn-send-ai">Send</button>
+    </form>
+  </aside>
+
+  <!-- ========================================================================
+       MODALS: SOS CONFIRMATION, DIGITAL ID, DETAILS
+       ======================================================================== -->
+  
+  <!-- SOS Modal -->
+  <div class="modal-backdrop" id="sosModal" role="dialog" aria-modal="true" aria-labelledby="sosModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="sosModalTitle">Emergency SOS Confirmation</h3>
+        <button class="btn-close-panel" onclick="closeAllModals()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="sos-modal-content">
+          <div class="sos-alert-icon-large">🚨</div>
+          <div style="display: inline-block; font-size: 11px; font-weight: 700; color: #0369a1; background: #e0f2fe; border: 1px solid #bae6fd; padding: 3px 10px; border-radius: 9999px; margin-bottom: 12px; text-transform: uppercase;">
+            DEMO SIMULATION • Local Prototype
+          </div>
+          <h4 class="sos-headline">Send emergency alert?</h4>
+          <p class="sos-subtext">
+            Simulates broadcasting high-precision GPS telemetry to the Authority Command Center. This is a local hackathon demonstration; no real emergency services will be contacted.
+          </p>
+
+          <div class="sos-data-box">
+            <div class="sos-data-row">
+              <span class="sos-data-label">Tourist ID:</span>
+              <span class="sos-data-val" id="sosTouristIdVal">ST-8F42A1</span>
+            </div>
+            <div class="sos-data-row">
+              <span class="sos-data-label">Live GPS Location:</span>
+              <span class="sos-data-val" id="sosLocationVal">26.9239° N, 75.8267° E</span>
+            </div>
+            <div class="sos-data-row">
+              <span class="sos-data-label">Timestamp:</span>
+              <span class="sos-data-val" id="sosTimestampVal">10:42 AM</span>
+            </div>
+            <div class="sos-data-row">
+              <span class="sos-data-label">Priority:</span>
+              <span class="sos-data-val" style="color: #ef4444;" id="sosRiskVal">EMERGENCY ESCALATION</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel-modal" id="btnCancelSos">Cancel</button>
+        <button class="btn-confirm-sos" id="btnConfirmSos">Send Demo SOS Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Digital ID Pass Modal -->
+  <div class="modal-backdrop" id="digitalIdModal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Verified Travel Identity</h3>
+        <button class="btn-close-panel" onclick="closeAllModals()">✕</button>
+      </div>
+      <div class="modal-body" id="digitalIdModalContent">
+        <!-- Content populated via app.js -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel-modal" onclick="closeAllModals()" style="background: #0f172a; color: #ffffff;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Destination Details Modal -->
+  <div class="modal-backdrop" id="detailsModal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Destination Safety Intelligence</h3>
+        <button class="btn-close-panel" onclick="closeAllModals()">✕</button>
+      </div>
+      <div class="modal-body" id="detailsModalContent">
+        <!-- Content populated dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel-modal" onclick="closeAllModals()" style="background: #0f172a; color: #ffffff;">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MINIMAL PREMIUM FOOTER
+       ======================================================================== -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand-wrap">
+          <div class="footer-logo">SAFETRIP</div>
+          <div class="footer-tagline">Travel freely. Stay protected.</div>
+        </div>
+
+        <ul class="footer-links">
+          <li><a href="#hero">Privacy & ZK-Proofs</a></li>
+          <li><a href="#safety-map">Emergency Response</a></li>
+          <li><a href="#status">Help Center</a></li>
+          <li><a href="#routes">About Project</a></li>
+          <li><a href="authority.html" style="font-weight: 600; color: #0284c7;">Command Center Portal &rarr;</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-bottom">
+        Smart India Hackathon Prototype • Smart Tourist Safety Monitoring & Incident Response System
+      </div>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- SAFETRIP Scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

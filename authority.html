@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAFETRIP — Authority & Police Command Center</title>
+  <meta name="description" content="Municipal Police and Tourism Authority incident triage, live spatial risk monitoring, and proactive tourist protection.">
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet.js CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- Authority Dashboard Styles -->
+  <link rel="stylesheet" href="css/authority.css">
+</head>
+<body class="authority-body">
+
+  <!-- ========================================================================
+       COMMAND CENTER HEADER
+       ======================================================================== -->
+  <header class="cmd-header">
+    <div class="cmd-header-inner">
+      <div class="cmd-brand">
+        <div class="cmd-logo-badge">ST</div>
+        <div class="cmd-title">
+          SAFETRIP COMMAND CENTER
+          <span class="cmd-status-badge">
+            <span class="cmd-status-dot"></span>
+            System Operational
+          </span>
+          <span class="cmd-status-badge" style="background: rgba(2, 132, 199, 0.15); color: #38bdf8; border-color: rgba(2, 132, 199, 0.3);">
+            ● DEMO SIMULATION
+          </span>
+        </div>
+      </div>
+
+      <nav class="cmd-nav" aria-label="Authority Navigation">
+        <span class="cmd-nav-item active">Overview</span>
+        <span class="cmd-nav-item">Live Map</span>
+        <span class="cmd-nav-item">Incidents</span>
+        <span class="cmd-nav-item">Tourists</span>
+        <span class="cmd-nav-item">Geo-Fences</span>
+        <span class="cmd-nav-item">Analytics</span>
+      </nav>
+
+      <div>
+        <a href="index.html" class="btn-switch-tourist" title="Switch to Tourist Companion View">
+          <span>&larr;</span> Tourist View
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       MAIN COMMAND CENTER WORKSPACE
+       ======================================================================== -->
+  <main class="cmd-container">
+    
+    <!-- 1. SUMMARY KPI CARDS -->
+    <section class="cmd-kpi-grid" aria-label="System KPI Overview">
+      
+      <div class="cmd-kpi-card safe-card">
+        <div>
+          <div class="cmd-kpi-label">Active Tourists</div>
+          <div class="cmd-kpi-val" id="kpiActiveTourists">12,483</div>
+        </div>
+        <div class="cmd-kpi-badge safe">Monitored</div>
+      </div>
+
+      <div class="cmd-kpi-card caution-card">
+        <div>
+          <div class="cmd-kpi-label">High Risk Tourists</div>
+          <div class="cmd-kpi-val" id="kpiHighRisk">27</div>
+        </div>
+        <div class="cmd-kpi-badge caution">Elevated</div>
+      </div>
+
+      <div class="cmd-kpi-card alert-card">
+        <div>
+          <div class="cmd-kpi-label">Active SOS Alerts</div>
+          <div class="cmd-kpi-val" id="kpiSosAlerts">4</div>
+        </div>
+        <div class="cmd-kpi-badge high">Immediate Action</div>
+      </div>
+
+      <div class="cmd-kpi-card">
+        <div>
+          <div class="cmd-kpi-label">Geo-Fence Alerts</div>
+          <div class="cmd-kpi-val" id="kpiGeofenceAlerts">19</div>
+        </div>
+        <div class="cmd-kpi-badge safe">Past 24h</div>
+      </div>
+
+    </section>
+
+    <!-- 2. MAIN SPLIT VIEW: LIVE MAP & INCIDENTS QUEUE -->
+    <div class="cmd-split-view">
+      
+      <!-- Live Map Panel -->
+      <section class="cmd-panel" aria-label="Command Center Live Spatial Map">
+        <div class="cmd-panel-head">
+          <div class="cmd-panel-title">
+            <span>🗺️</span> Live Risk & Telemetry Map — Jaipur Grid
+          </div>
+
+          <!-- Risk Filters -->
+          <div class="map-filter-group">
+            <button class="btn-filter-map active" data-filter="all" onclick="filterMapTourists('all')">All</button>
+            <button class="btn-filter-map" data-filter="low" onclick="filterMapTourists('low')">Low Risk</button>
+            <button class="btn-filter-map" data-filter="medium" onclick="filterMapTourists('medium')">Medium</button>
+            <button class="btn-filter-map" data-filter="high" onclick="filterMapTourists('high')">High Risk</button>
+            <button class="btn-filter-map" data-filter="sos" onclick="filterMapTourists('sos')">SOS</button>
+          </div>
+        </div>
+
+        <div id="authorityMap" aria-label="Police Operations Leaflet Map"></div>
+      </section>
+
+      <!-- Active Incidents Panel -->
+      <section class="cmd-panel" aria-label="Real-time Incident Queue">
+        <div class="cmd-panel-head">
+          <div class="cmd-panel-title">
+            <span>🚨</span> Active Incidents Queue
+          </div>
+          <span style="font-size: 11.5px; color: #94a3b8;">Real-Time Feed</span>
+        </div>
+
+        <div class="incidents-scroll-list" id="incidentsContainer">
+          <!-- Populated dynamically via authority.js -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- 3. SECONDARY CONTROLS GRID -->
+    <div class="cmd-bottom-grid">
+      
+      <!-- AI Risk Engine Explainability -->
+      <section class="cmd-panel">
+        <div class="cmd-panel-head">
+          <div class="cmd-panel-title">
+            <span>🧠</span> AI Risk Explainability Engine
+          </div>
+        </div>
+
+        <div class="explain-card-body">
+          <div class="explain-tourist-header">
+            <div>
+              <div style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: 600;">Selected Subject</div>
+              <div style="font-size: 16px; font-weight: 700; color: #ffffff;" id="explainTouristName">Sid</div>
+            </div>
+            <div style="font-family: monospace; font-size: 12px; color: #38bdf8;" id="explainTouristId">ST-8F42A1</div>
+          </div>
+
+          <div style="font-size: 12.5px; font-weight: 600; color: #cbd5e1;">
+            Why is this tourist rated high risk?
+          </div>
+
+          <div class="explain-factors-list" id="explainFactorsList">
+            <!-- Populated dynamically -->
+          </div>
+
+          <div class="explain-total-box">
+            <span style="font-size: 13px; font-weight: 600; color: #cbd5e1;">Cumulative Risk Score:</span>
+            <span class="explain-total-score" id="explainTotalRisk">91 / 100</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Geo-Fence Boundary Management -->
+      <section class="cmd-panel">
+        <div class="cmd-panel-head">
+          <div class="cmd-panel-title">
+            <span>🛡️</span> Geo-Fence Boundary Management
+          </div>
+          <button class="btn-filter-map" onclick="addGeofenceDemo()" style="background: #0284c7; color: #ffffff;">
+            + Add Zone
+          </button>
+        </div>
+
+        <div class="geofence-list" id="geofenceItemsList">
+          <!-- Populated dynamically via authority.js -->
+        </div>
+      </section>
+
+      <!-- Digital ID Verification Panel -->
+      <section class="cmd-panel">
+        <div class="cmd-panel-head">
+          <div class="cmd-panel-title">
+            <span>🔒</span> Blockchain Digital ID Verification
+          </div>
+        </div>
+
+        <div class="verify-card-body">
+          <p style="font-size: 12.5px; color: #94a3b8;">
+            Query decentralized state proofs to verify identity tokens, medical notes, and authorized contacts without revealing private biometric data.
+          </p>
+
+          <div class="verify-input-group">
+            <input 
+              type="text" 
+              class="verify-input" 
+              id="verifyIdInput" 
+              placeholder="Enter Tourist ID (e.g. ST-8F42A1)"
+              value="ST-8F42A1"
+              aria-label="Tourist ID Query"
+            >
+            <button class="btn-verify-submit" id="btnVerifyTouristId">Verify</button>
+          </div>
+
+          <div class="verify-result-box" id="verificationResultBox">
+            <div class="verify-status-head">
+              <span>✓</span> Verified on Blockchain Ledger (DEMO)
+            </div>
+            <div class="verify-row">
+              <span class="label">Tourist ID:</span>
+              <span class="val">ST-8F42A1</span>
+            </div>
+            <div class="verify-row">
+              <span class="label">Name:</span>
+              <span class="val">Sid (IND)</span>
+            </div>
+            <div class="verify-row">
+              <span class="label">Identity Status:</span>
+              <span class="val" style="color: #34d399;">Active • ZK-Proof Verified</span>
+            </div>
+            <div class="verify-row">
+              <span class="label">Emergency Contact:</span>
+              <span class="val">Connected (+91 98765 12345)</span>
+            </div>
+            <div class="verify-row">
+              <span class="label">Blockchain Hash:</span>
+              <span class="val" style="font-family: monospace; font-size: 11px; color: #38bdf8;">0x7f8a92d4e1b8...</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================================================
+       COMMAND CENTER MODALS (DEMO DIALOGS)
+       ======================================================================== -->
+  <!-- Contact Tourist Modal -->
+  <div id="cmdContactModal" style="display: none; position: fixed; inset: 0; background: rgba(11, 17, 32, 0.8); backdrop-filter: blur(4px); z-index: 2000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: #1e293b; border: 1px solid #334155; border-radius: 16px; max-width: 440px; width: 100%; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #334155; padding-bottom: 12px;">
+        <h4 style="font-size: 16px; font-weight: 700; color: #ffffff;">📡 Telemetry Outreach (DEMO)</h4>
+        <button onclick="closeCmdContactModal()" style="color: #94a3b8; font-size: 18px;">✕</button>
+      </div>
+      <div style="display: inline-block; font-size: 11px; font-weight: 700; color: #0284c7; background: rgba(2, 132, 199, 0.15); border: 1px solid rgba(2, 132, 199, 0.3); padding: 3px 10px; border-radius: 9999px; margin-bottom: 12px;">
+        PROTOTYPE SIMULATION
+      </div>
+      <p style="font-size: 13px; color: #cbd5e1; margin-bottom: 16px;" id="cmdContactDesc">
+        Simulating priority voice callback and high-frequency ping to tourist device. No real telephone calls are placed.
+      </p>
+      <div style="background: #0f172a; border-radius: 10px; padding: 14px; font-size: 12.5px; margin-bottom: 20px;" id="cmdContactDetails">
+        <!-- Filled by JS -->
+      </div>
+      <div style="display: flex; justify-content: flex-end;">
+        <button onclick="closeCmdContactModal()" style="background: #0284c7; color: #ffffff; padding: 9px 18px; border-radius: 8px; font-weight: 600; font-size: 13px;">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Geofence Modal -->
+  <div id="cmdAddGeofenceModal" style="display: none; position: fixed; inset: 0; background: rgba(11, 17, 32, 0.8); backdrop-filter: blur(4px); z-index: 2000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: #1e293b; border: 1px solid #334155; border-radius: 16px; max-width: 440px; width: 100%; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #334155; padding-bottom: 12px;">
+        <h4 style="font-size: 16px; font-weight: 700; color: #ffffff;">🛡️ Add Monitored Geofence</h4>
+        <button onclick="closeAddGeofenceModal()" style="color: #94a3b8; font-size: 18px;">✕</button>
+      </div>
+      <form id="addGeofenceForm" onsubmit="submitNewGeofence(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Zone Name</label>
+          <input type="text" id="newZoneName" value="Jal Mahal Promenade Extension" required style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 9px 12px; color: #ffffff; font-size: 13px; outline: none;">
+        </div>
+        <div>
+          <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Zone Classification</label>
+          <select id="newZoneType" style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 9px 12px; color: #ffffff; font-size: 13px; outline: none;">
+            <option value="caution">Caution Zone (Amber)</option>
+            <option value="safe">Safe Corridor (Green)</option>
+            <option value="restricted">Restricted Hazard Zone (Red)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Safety Index Score (0–100)</label>
+          <input type="number" id="newZoneScore" min="10" max="100" value="65" style="width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 9px 12px; color: #ffffff; font-size: 13px; outline: none;">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+          <button type="button" onclick="closeAddGeofenceModal()" style="background: transparent; color: #94a3b8; padding: 8px 14px; font-size: 13px;">Cancel</button>
+          <button type="submit" style="background: #0284c7; color: #ffffff; padding: 8px 18px; border-radius: 8px; font-weight: 600; font-size: 13px;">Deploy Zone</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- SAFETRIP Scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/authority.js"></script>
+</body>
+</html>
