@@ -75,8 +75,25 @@ function initSafetyMap() {
     zoom: 13,
     zoomControl: true,
     attributionControl: false,
-    scrollWheelZoom: false // Keep geometry and zoom level stable when scrolling or hovering with cursor
+    scrollWheelZoom: true,
+    touchZoom: true,
+    wheelDebounceTime: 40,
+    wheelPxPerZoomLevel: 60
   });
+
+  // Trackpad pinch-to-zoom: only zoom on pinch gesture (ctrlKey === true), allowing normal page scroll otherwise
+  if (mapInstance.scrollWheelZoom) {
+    const defaultWheelHandler = mapInstance.scrollWheelZoom._onWheelScroll.bind(mapInstance.scrollWheelZoom);
+    mapInstance.scrollWheelZoom._onWheelScroll = function (e) {
+      if (e.ctrlKey) {
+        defaultWheelHandler(e);
+      }
+    };
+  }
+
+  // Prevent browser-level whole-page pinch gesture in Safari over map
+  mapElement.addEventListener("gesturestart", (e) => e.preventDefault());
+  mapElement.addEventListener("gesturechange", (e) => e.preventDefault());
 
   // OpenStreetMap Tile Layer with clean visual tuning
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {

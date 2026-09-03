@@ -63,8 +63,23 @@ function initAuthorityMap() {
     center: SafeTripData.center,
     zoom: 13,
     attributionControl: false,
-    scrollWheelZoom: false
+    scrollWheelZoom: true,
+    touchZoom: true,
+    wheelDebounceTime: 40,
+    wheelPxPerZoomLevel: 60
   });
+
+  if (authorityMap.scrollWheelZoom) {
+    const defaultWheelHandler = authorityMap.scrollWheelZoom._onWheelScroll.bind(authorityMap.scrollWheelZoom);
+    authorityMap.scrollWheelZoom._onWheelScroll = function (e) {
+      if (e.ctrlKey) {
+        defaultWheelHandler(e);
+      }
+    };
+  }
+
+  mapEl.addEventListener("gesturestart", (e) => e.preventDefault());
+  mapEl.addEventListener("gesturechange", (e) => e.preventDefault());
 
   // OpenStreetMap Base Tiles
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
