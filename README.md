@@ -69,7 +69,7 @@ No build tools or heavy dependencies required. Run using Python's built-in HTTP 
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/sonubrmn/Safetrip
 cd SIH
 
 # Start a local web server (Python 3)
